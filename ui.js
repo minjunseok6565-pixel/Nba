@@ -4,7 +4,7 @@ const screenTeamSelect = document.getElementById('screen-team-select');
 const screenMain = document.getElementById('screen-main');
 
 const apiKeyInput = document.getElementById('apiKeyInput');
-const btnApiKeyNext = document.getElementById('btnApiKeyNext');
+const btnApiKeyNext = document.getElementById('btnValidateKey');
 
 const teamGrid = document.getElementById('teamGrid');
 const btnTeamContinue = document.getElementById('btnTeamContinue');
