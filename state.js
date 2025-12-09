@@ -10,7 +10,11 @@ let appState = {
     scores: { latest_date: null, games: [] },
     // past_games 제거 -> 전체 시즌 games + currentIndex
     schedule: { teamId: null, games: [], currentIndex: 0 },
-    news: []
+    news: [],
+    stats: { leaders: null, lastLoaded: null },
+    standings: { east: [], west: [], lastLoaded: null },
+    teams: { list: [], detailById: {}, lastLoaded: null },
+    weeklyNews: { items: [], lastLoaded: null }
   },
   rosters: {},
   // ✅ LLM 대화 히스토리 (최근 N턴만 컨텍스트에 사용)

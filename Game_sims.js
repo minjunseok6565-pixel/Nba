@@ -319,6 +319,13 @@ async function simulateGameProgress() {
     renderAllTabs();
     renderSidebarRecentGames();
 
+    // 스탯/순위/뉴스/팀 캐시 무효화
+    const cv = appState.cachedViews;
+    if (cv.stats) cv.stats.lastLoaded = null;
+    if (cv.standings) cv.standings.lastLoaded = null;
+    if (cv.weeklyNews) cv.weeklyNews.lastLoaded = null;
+    if (cv.teams) cv.teams.lastLoaded = null;
+
     // 보조 LLM에 STATE_UPDATE 맡기기 (있으면)
     if (appState.apiKey) {
       callSubLLMStateUpdate(data);

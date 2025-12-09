@@ -95,6 +95,7 @@ def advance_league_until(
                 home_id=home_id,
                 away_id=away_id,
                 score=score,
+                boxscore=result.get("boxscore"),
                 game_date=day_str,
             )
 
@@ -144,6 +145,12 @@ def simulate_single_game(
     result = engine.simulate_game()
 
     # 인게임 날짜를 서버 STATE에도 반영
-    update_state_with_game(home_id, away_id, result.get("final_score", {}), game_date=game_date)
+    update_state_with_game(
+        home_id,
+        away_id,
+        result.get("final_score", {}),
+        boxscore=result.get("boxscore"),
+        game_date=game_date,
+    )
 
     return result

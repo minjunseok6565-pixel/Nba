@@ -28,7 +28,8 @@ def parse_weight(wt_str):
 # 2. Player 클래스
 # -----------------------------------------------------------------------------
 class Player:
-  def __init__(self, row_data):
+  def __init__(self, row_data, player_id):
+      self.player_id = player_id
       self.name = row_data['Name']
       self.pos = row_data['POS']
       self.team = row_data['Team']
@@ -87,7 +88,7 @@ class Player:
 class Team:
   def __init__(self, team_name, roster_df, tactics=None):
       self.name = team_name
-      self.players = [Player(row) for _, row in roster_df.iterrows()]
+      self.players = [Player(row, idx) for idx, row in roster_df.iterrows()]
 
       self.tactics = tactics if tactics else {
           'pace': 0, 'focus': 'balanced', 'aggression': 0
@@ -258,6 +259,8 @@ class MatchEngine:
               bs = p.boxscore
               if bs['FGA'] > 0 or bs['REB'] > 0 or bs['AST'] > 0:
                   stats = dict(bs)
+                  stats['PlayerID'] = p.player_id
+                  stats['Team'] = p.team
                   stats['Name'] = p.name
                   data.append(stats)
           return data

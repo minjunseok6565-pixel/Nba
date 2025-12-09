@@ -21,6 +21,7 @@ GAME_STATE: Dict[str, Any] = {
     "schema_version": "1.1",
     "turn": 0,
     "games": [],  # 각 경기의 메타 데이터
+    "player_stats": {},  # player_id -> 시즌 누적 스탯
     "cached_views": {
         "scores": {
             "latest_date": None,
@@ -31,6 +32,13 @@ GAME_STATE: Dict[str, Any] = {
         },
         "news": {
             "items": []  # 간단 뉴스 피드
+        },
+        "stats": {
+            "leaders": None,
+        },
+        "weekly_news": {
+            "last_generated_week_start": None,
+            "items": [],
         },
     },
     "league": {
@@ -289,11 +297,13 @@ def update_state_with_game(
     home_id: str,
     away_id: str,
     score: Dict[str, int],
+    boxscore: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     game_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     """매치엔진 결과를 GAME_STATE와 cached_views에 반영.
 
     - game_date 가 주어지면 그 값을 사용, 없으면 서버 기준 오늘 날짜 사용.
+    - boxscore 가 주어지면 시즌 누적 player_stats 에 반영한다.
     """
     game_date_str = str(game_date) if game_date else date.today().isoformat()
     game_id = f"{game_date_str}_{home_id}_{away_id}"
@@ -317,6 +327,9 @@ def update_state_with_game(
 
     # games 리스트에 추가
     GAME_STATE["games"].append(game_obj)
+
+    if boxscore:
+        _update_player_stats_from_boxscore(boxscore)
 
     # scores 캐시 업데이트 (가장 최근 일자 기준)
     scores_view = GAME_STATE["cached_views"]["scores"]
@@ -365,6 +378,48 @@ def update_state_with_game(
     )
 
     return game_obj
+
+
+def _update_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]) -> None:
+    """박스스코어를 시즌 누적 player_stats에 반영한다."""
+    if not boxscore:
+        return
+
+    season_stats = GAME_STATE.setdefault("player_stats", {})
+    track_stats = ["PTS", "AST", "REB", "3PM"]
+
+    for team_rows in boxscore.values():
+        if not isinstance(team_rows, list):
+            continue
+        for row in team_rows:
+            if not isinstance(row, dict):
+                continue
+            player_id = row.get("PlayerID")
+            if player_id is None:
+                continue
+            stat_entry = season_stats.setdefault(
+                player_id,
+                {
+                    "player_id": player_id,
+                    "name": row.get("Name"),
+                    "team_id": row.get("Team"),
+                    "games": 0,
+                    "totals": {s: 0.0 for s in track_stats},
+                },
+            )
+
+            stat_entry["name"] = row.get("Name", stat_entry.get("name"))
+            stat_entry["team_id"] = row.get("Team", stat_entry.get("team_id"))
+            stat_entry["games"] = stat_entry.get("games", 0) + 1
+
+            totals = stat_entry.setdefault("totals", {s: 0.0 for s in track_stats})
+            for stat_name in track_stats:
+                try:
+                    totals[stat_name] = float(totals.get(stat_name, 0.0)) + float(
+                        row.get(stat_name, 0) or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
 
 
 def apply_state_update(update: Dict[str, Any]) -> None:

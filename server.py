@@ -14,6 +14,13 @@ from pydantic import BaseModel
 from config import BASE_DIR, ROSTER_DF, ALL_TEAM_IDS
 from state import GAME_STATE, _ensure_league_state, initialize_master_schedule_if_needed, apply_state_update
 from league_sim import simulate_single_game, advance_league_until
+from news_ai import refresh_weekly_news
+from stats_util import compute_league_leaders
+from team_utils import (
+    get_conference_standings,
+    get_team_cards,
+    get_team_detail,
+)
 
 
 # -------------------------------------------------------------------------
@@ -71,6 +78,10 @@ class StateUpdateRequest(BaseModel):
 class AdvanceLeagueRequest(BaseModel):
     target_date: str  # YYYY-MM-DD, 이 날짜까지 리그를 자동 진행
     user_team_id: Optional[str] = None
+
+
+class WeeklyNewsRequest(BaseModel):
+    apiKey: str
 
 
 # -------------------------------------------------------------------------
@@ -136,6 +147,49 @@ async def api_advance_league(req: AdvanceLeagueRequest):
         "simulated_count": len(simulated),
         "simulated_games": simulated,
     }
+
+
+# -------------------------------------------------------------------------
+# 리그 리더 / 스탠딩 / 팀 API
+# -------------------------------------------------------------------------
+
+
+@app.get("/api/stats/leaders")
+async def api_stats_leaders():
+    return compute_league_leaders()
+
+
+@app.get("/api/standings")
+async def api_standings():
+    return get_conference_standings()
+
+
+@app.get("/api/teams")
+async def api_teams():
+    return get_team_cards()
+
+
+@app.get("/api/team-detail/{team_id}")
+async def api_team_detail(team_id: str):
+    try:
+        return get_team_detail(team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# 주간 뉴스 (LLM 요약)
+# -------------------------------------------------------------------------
+
+
+@app.post("/api/news/week")
+async def api_news_week(req: WeeklyNewsRequest):
+    if not req.apiKey:
+        raise HTTPException(status_code=400, detail="apiKey is required")
+    try:
+        return refresh_weekly_news(req.apiKey)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weekly news generation failed: {e}")
 
 
 # -------------------------------------------------------------------------

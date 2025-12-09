@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from config import ROSTER_DF, ALL_TEAM_IDS, TEAM_TO_CONF_DIV
+from config import HARD_CAP, ROSTER_DF, ALL_TEAM_IDS, TEAM_TO_CONF_DIV
 from state import GAME_STATE, _ensure_league_state, initialize_master_schedule_if_needed
 
 
@@ -91,6 +91,11 @@ def _compute_team_payroll(team_id: str) -> float:
     return float(df["SalaryAmount"].sum())
 
 
+def _compute_cap_space(team_id: str) -> float:
+    payroll = _compute_team_payroll(team_id)
+    return HARD_CAP - payroll
+
+
 def _compute_team_records() -> Dict[str, Dict[str, Any]]:
     """master_schedule.games를 기준으로 각 팀의 승/패/득실점 계산.
 
@@ -131,6 +136,169 @@ def _compute_team_records() -> Dict[str, Dict[str, Any]]:
             records[home_id]["losses"] += 1
 
     return records
+
+
+def get_conference_standings() -> Dict[str, List[Dict[str, Any]]]:
+    """컨퍼런스별 스탠딩을 계산한다."""
+    records = _compute_team_records()
+
+    standings = {"east": [], "west": []}
+
+    for tid, rec in records.items():
+        info = TEAM_TO_CONF_DIV.get(tid, {})
+        conf = info.get("conference")
+        if not conf:
+            continue
+
+        wins = rec.get("wins", 0)
+        losses = rec.get("losses", 0)
+        games_played = wins + losses
+        win_pct = wins / games_played if games_played else 0.0
+        pf = rec.get("pf", 0)
+        pa = rec.get("pa", 0)
+        point_diff = pf - pa
+
+        entry = {
+            "team_id": tid,
+            "conference": conf,
+            "division": info.get("division"),
+            "wins": wins,
+            "losses": losses,
+            "win_pct": win_pct,
+            "games_played": games_played,
+            "point_diff": point_diff,
+        }
+
+        if conf.lower() == "east":
+            standings["east"].append(entry)
+        else:
+            standings["west"].append(entry)
+
+    def sort_and_gb(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        rows_sorted = sorted(
+            rows,
+            key=lambda r: (r.get("win_pct", 0), r.get("point_diff", 0)),
+            reverse=True,
+        )
+        if not rows_sorted:
+            return rows_sorted
+
+        leader = rows_sorted[0]
+        leader_w, leader_l = leader.get("wins", 0), leader.get("losses", 0)
+        for r in rows_sorted:
+            gb = ((leader_w - r.get("wins", 0)) + (r.get("losses", 0) - leader_l)) / 2
+            r["gb"] = gb
+        for idx, r in enumerate(rows_sorted, start=1):
+            r["rank"] = idx
+        return rows_sorted
+
+    standings["east"] = sort_and_gb(standings["east"])
+    standings["west"] = sort_and_gb(standings["west"])
+
+    return standings
+
+
+def get_team_cards() -> List[Dict[str, Any]]:
+    """팀 카드(요약 정보) 리스트를 반환한다."""
+    _init_players_and_teams_if_needed()
+    records = _compute_team_records()
+
+    team_cards: List[Dict[str, Any]] = []
+    for tid in ALL_TEAM_IDS:
+        meta = GAME_STATE["teams"].get(tid, {})
+        rec = records.get(tid, {})
+        wins = rec.get("wins", 0)
+        losses = rec.get("losses", 0)
+        gp = wins + losses
+        win_pct = wins / gp if gp else 0.0
+        card = {
+            "team_id": tid,
+            "conference": meta.get("conference"),
+            "division": meta.get("division"),
+            "wins": wins,
+            "losses": losses,
+            "win_pct": win_pct,
+            "tendency": meta.get("tendency"),
+            "payroll": _compute_team_payroll(tid),
+            "cap_space": _compute_cap_space(tid),
+        }
+        team_cards.append(card)
+
+    return team_cards
+
+
+def get_team_detail(team_id: str) -> Dict[str, Any]:
+    """특정 팀의 상세 정보 + 로스터를 반환한다."""
+    _init_players_and_teams_if_needed()
+    tid = team_id.upper()
+
+    records = _compute_team_records()
+    standings = get_conference_standings()
+    rank_map = {r["team_id"]: r for r in standings.get("east", []) + standings.get("west", [])}
+
+    meta = GAME_STATE["teams"].get(tid)
+    if not meta:
+        raise ValueError(f"Team '{tid}' not found")
+
+    rec = records.get(tid, {})
+    rank_entry = rank_map.get(tid, {})
+    wins = rec.get("wins", 0)
+    losses = rec.get("losses", 0)
+    gp = wins + losses
+    win_pct = wins / gp if gp else 0.0
+    pf = rec.get("pf", 0)
+    pa = rec.get("pa", 0)
+    point_diff = pf - pa
+
+    summary = {
+        "team_id": tid,
+        "conference": meta.get("conference"),
+        "division": meta.get("division"),
+        "wins": wins,
+        "losses": losses,
+        "win_pct": win_pct,
+        "point_diff": point_diff,
+        "rank": rank_entry.get("rank"),
+        "gb": rank_entry.get("gb"),
+        "tendency": meta.get("tendency"),
+        "payroll": _compute_team_payroll(tid),
+        "cap_space": _compute_cap_space(tid),
+    }
+
+    roster_rows = ROSTER_DF[ROSTER_DF["Team"] == tid]
+    season_stats = GAME_STATE.get("player_stats", {})
+    roster: List[Dict[str, Any]] = []
+    for pid, row in roster_rows.iterrows():
+        p_stats = season_stats.get(pid, {})
+        games = p_stats.get("games", 0) or 0
+        totals = p_stats.get("totals", {}) or {}
+        def per_game_val(key: str) -> float:
+            try:
+                return float(totals.get(key, 0.0)) / games if games else 0.0
+            except (TypeError, ValueError, ZeroDivisionError):
+                return 0.0
+
+        roster.append(
+            {
+                "player_id": pid,
+                "name": row.get("Name"),
+                "pos": row.get("POS"),
+                "ovr": float(row.get("OVR", 0.0)) if "OVR" in roster_rows.columns else 0.0,
+                "age": int(row.get("Age", 0)) if not pd.isna(row.get("Age", None)) else 0,
+                "salary": float(row.get("SalaryAmount", 0.0)),
+                "pts": per_game_val("PTS"),
+                "ast": per_game_val("AST"),
+                "reb": per_game_val("REB"),
+                "three_pm": per_game_val("3PM"),
+            }
+        )
+
+    roster_sorted = sorted(roster, key=lambda r: r.get("ovr", 0), reverse=True)
+
+    return {
+        "summary": summary,
+        "roster": roster_sorted,
+    }
 
 
 def _evaluate_team_needs(records: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
