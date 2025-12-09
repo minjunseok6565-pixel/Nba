@@ -29,6 +29,7 @@ const tabTitle = document.getElementById('tabTitle');
 const homeLog = document.getElementById('homeLog');
 const homeUserInput = document.getElementById('homeUserInput');
 const btnSendToLLM = document.getElementById('btnSendToLLM');
+const btnSimGame = document.getElementById('btnSimGame');
 const homeLLMOutput = document.getElementById('homeLLMOutput');
 const mainPromptTextarea = document.getElementById('mainPromptTextarea');
 const llmStatus = document.getElementById('llmStatus');

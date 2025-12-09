@@ -202,6 +202,32 @@ async function callSubLLMStateUpdate(engineOutput) {
   }
 }
 
+// 이벤트 바인딩: 메인 LLM 호출
+if (typeof btnSendToLLM !== 'undefined' && btnSendToLLM) {
+  btnSendToLLM.addEventListener('click', sendToMainLLM);
+}
+
+// 이벤트 바인딩: 빠른 경기 시뮬레이션
+if (typeof btnSimGame !== 'undefined' && btnSimGame) {
+  btnSimGame.addEventListener('click', async () => {
+    if (!appState.selectedTeam) {
+      alert('먼저 팀을 선택한 뒤 진행하세요.');
+      return;
+    }
+
+    btnSimGame.disabled = true;
+    const originalText = btnSimGame.textContent;
+    btnSimGame.textContent = '경기 시뮬레이션 중...';
+
+    try {
+      await simulateGameProgress();
+    } finally {
+      btnSimGame.disabled = false;
+      btnSimGame.textContent = originalText;
+    }
+  });
+}
+
 // 로스터 불러오기
 async function loadRosterForTeam(teamId) {
   if (!teamId) return;
