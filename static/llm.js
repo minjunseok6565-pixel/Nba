@@ -1,6 +1,23 @@
 // LLM 관련 상태
 let isLLMLoading = false;
+let isSubLLMLoading = false;
 const subPromptTextarea = document.getElementById('subPromptTextarea');
+
+function setLLMLoadingStatus(kind, loading, message) {
+  if (!llmStatus) return;
+
+  if (loading) {
+    llmStatus.textContent = message || 'LLM 처리 중...';
+    if (homeLLMOutput && kind === 'main') {
+      homeLLMOutput.textContent = llmStatus.textContent;
+    }
+  } else {
+    // 메인/서브 둘 다 끝났을 때만 비움
+    if (!isLLMLoading && !isSubLLMLoading) {
+      llmStatus.textContent = '';
+    }
+  }
+}
 
 // 퍼스트 메시지 로딩
 function showFirstMessageForSelectedTeam() {
@@ -62,7 +79,7 @@ async function sendToMainLLM() {
   }
 
   isLLMLoading = true;
-  llmStatus.textContent = 'LLM 호출 중...';
+  setLLMLoadingStatus('main', true, 'LLM 응답 생성 중...');
   btnSendToLLM.disabled = true;
 
   try {
@@ -106,7 +123,7 @@ async function sendToMainLLM() {
     alert('LLM 호출 중 오류가 발생했습니다.');
   } finally {
     isLLMLoading = false;
-    llmStatus.textContent = '';
+    setLLMLoadingStatus('main', false);
     btnSendToLLM.disabled = false;
     homeUserInput.value = '';
   }
@@ -154,6 +171,8 @@ async function callSubLLMStateUpdate(engineOutput) {
   if (!appState.apiKey) return;
 
   try {
+    isSubLLMLoading = true;
+    setLLMLoadingStatus('sub', true, '보조 LLM이 상태를 업데이트 중...');
     const payload = {
       apiKey: appState.apiKey,
       subPrompt: (subPromptTextarea?.value || '').trim(),
@@ -177,6 +196,9 @@ async function callSubLLMStateUpdate(engineOutput) {
     console.log('STATE_UPDATE parsed:', data.parsed);
   } catch (e) {
     console.warn('STATE_UPDATE 호출 중 오류:', e);
+  } finally {
+    isSubLLMLoading = false;
+    setLLMLoadingStatus('sub', false);
   }
 }
 
