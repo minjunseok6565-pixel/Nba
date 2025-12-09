@@ -12,7 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from config import BASE_DIR, ROSTER_DF, ALL_TEAM_IDS
-from state import GAME_STATE, _ensure_league_state, initialize_master_schedule_if_needed, apply_state_update
+from state import (
+    GAME_STATE,
+    _ensure_league_state,
+    initialize_master_schedule_if_needed,
+    apply_state_update,
+    get_schedule_summary,
+)
 from league_sim import simulate_single_game, advance_league_until
 from news_ai import refresh_weekly_news
 from stats_util import compute_league_leaders
@@ -349,3 +355,9 @@ async def team_schedule(team_id: str):
 async def state_summary():
     """현재 GAME_STATE를 그대로 반환."""
     return GAME_STATE
+
+
+@app.get("/api/debug/schedule-summary")
+async def debug_schedule_summary():
+    """마스터 스케줄 생성/검증용 디버그 엔드포인트."""
+    return get_schedule_summary()
