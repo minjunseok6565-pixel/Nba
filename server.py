@@ -90,6 +90,10 @@ class WeeklyNewsRequest(BaseModel):
     apiKey: str
 
 
+class ApiKeyRequest(BaseModel):
+    apiKey: str
+
+
 # -------------------------------------------------------------------------
 # 유틸: Gemini 응답 텍스트 추출
 # -------------------------------------------------------------------------
@@ -196,6 +200,22 @@ async def api_news_week(req: WeeklyNewsRequest):
         return refresh_weekly_news(req.apiKey)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weekly news generation failed: {e}")
+
+
+@app.post("/api/validate-key")
+async def api_validate_key(req: ApiKeyRequest):
+    """주어진 Gemini API 키를 간단히 검증한다."""
+    if not req.apiKey:
+        raise HTTPException(status_code=400, detail="apiKey is required")
+
+    try:
+        genai.configure(api_key=req.apiKey)
+        # 최소 호출로 키 유효성 확인 (토큰 카운트 호출)
+        model = genai.GenerativeModel("gemini-3-pro-preview")
+        model.count_tokens("ping")
+        return {"valid": True}
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid API key: {e}")
 
 
 # -------------------------------------------------------------------------

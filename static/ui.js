@@ -5,6 +5,8 @@ const screenMain = document.getElementById('screen-main');
 
 const apiKeyInput = document.getElementById('apiKeyInput');
 const btnApiKeyNext = document.getElementById('btnValidateKey');
+const apiError = document.getElementById('apiError');
+const apiSuccess = document.getElementById('apiSuccess');
 
 const teamGrid = document.getElementById('teamGrid');
 const btnTeamContinue = document.getElementById('btnTeamContinue');
@@ -56,14 +58,51 @@ function showScreen(name) {
 }
 
 // API 키 입력 단계 버튼
-btnApiKeyNext.addEventListener('click', () => {
+btnApiKeyNext.addEventListener('click', async () => {
   const key = apiKeyInput.value.trim();
+  apiError.textContent = '';
+  apiSuccess.textContent = '';
+
   if (!key) {
-    alert('Gemini API 키를 입력해주세요.');
+    apiError.textContent = 'Gemini API 키를 입력해주세요.';
     return;
   }
-  appState.apiKey = key;
-  showScreen('teamSelect');
+
+  // 간단한 형식 검증 (AIza로 시작하는 키)
+  if (!/^AIza[0-9A-Za-z\-_]{10,}$/.test(key)) {
+    apiError.textContent = '키 형식이 올바르지 않습니다. AIza... 형태인지 확인하세요.';
+    return;
+  }
+
+  btnApiKeyNext.disabled = true;
+  const originalText = btnApiKeyNext.textContent;
+  btnApiKeyNext.textContent = '검증 중...';
+
+  try {
+    const res = await fetch('/api/validate-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: key })
+    });
+
+    if (!res.ok) {
+      let message = 'API 키 검증에 실패했습니다.';
+      try {
+        const data = await res.json();
+        if (data?.detail) message = data.detail;
+      } catch (_) {}
+      throw new Error(message);
+    }
+
+    apiSuccess.textContent = 'API 키가 확인되었습니다!';
+    appState.apiKey = key;
+    showScreen('teamSelect');
+  } catch (err) {
+    apiError.textContent = err.message || 'API 키 검증 중 오류가 발생했습니다.';
+  } finally {
+    btnApiKeyNext.disabled = false;
+    btnApiKeyNext.textContent = originalText;
+  }
 });
 
 // 팀 선택 UI 렌더링

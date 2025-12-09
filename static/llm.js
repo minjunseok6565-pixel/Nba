@@ -1,5 +1,6 @@
 // LLM 관련 상태
 let isLLMLoading = false;
+const subPromptTextarea = document.getElementById('subPromptTextarea');
 
 // 퍼스트 메시지 로딩
 function showFirstMessageForSelectedTeam() {
@@ -74,11 +75,12 @@ async function sendToMainLLM() {
 
     const payload = {
       apiKey: appState.apiKey,
-      userMessage: userInput,
-      context
+      mainPrompt: (mainPromptTextarea?.value || '').trim(),
+      userInput,
+      context: JSON.stringify(context)
     };
 
-    const res = await fetch('/api/main-llm', {
+    const res = await fetch('/api/chat-main', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -91,7 +93,7 @@ async function sendToMainLLM() {
     }
 
     const data = await res.json();
-    const answer = (data.answer || '').trim();
+    const answer = (data.reply || data.answer || '').trim();
     homeLLMOutput.textContent = answer || '(빈 응답)';
 
     // 어시스턴트 응답도 히스토리에 추가
@@ -154,12 +156,12 @@ async function callSubLLMStateUpdate(engineOutput) {
   try {
     const payload = {
       apiKey: appState.apiKey,
+      subPrompt: (subPromptTextarea?.value || '').trim(),
       engineOutput,
-      // 필요하다면, 여기에서도 teamId나 간단한 팀 정보 정도를 함께 넘길 수 있다.
-      selectedTeamId: appState.selectedTeam?.id || null
+      currentState: appState.cachedViews?.schedule || null,
     };
 
-    const res = await fetch('/api/state-update-llm', {
+    const res = await fetch('/api/state-update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
