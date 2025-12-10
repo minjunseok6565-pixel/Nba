@@ -743,7 +743,7 @@ tr:last-child td { border-bottom:none; }
   min-height:calc(100vh - 80px);
   display:flex;
   flex-direction:column;
-  max-width:1200px;
+  max-width:1560px;
   margin:0 auto;
 }
 
