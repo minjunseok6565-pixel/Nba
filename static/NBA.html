@@ -99,6 +99,7 @@
         <!-- 중앙 탭 -->
         <nav class="top-nav-center">
           <button class="nav-tab active" data-tab="home">Home</button>
+          <button class="nav-tab" data-tab="tactics">Tactics</button>
           <button class="nav-tab" data-tab="scores">Scores</button>
           <button class="nav-tab" data-tab="schedule">Schedule</button>
           <button class="nav-tab" data-tab="standings">Standings</button>
@@ -191,11 +192,11 @@
             <div>
               <div class="tab-eyebrow">NBA GM</div>
               <!-- JS가 이 텍스트를 바꾸므로 id 유지 -->
-              <h1 class="tab-title" id="tabTitle">Home</h1>
-            </div>
-          </div>
+          <h1 class="tab-title" id="tabTitle">Home</h1>
+        </div>
+      </div>
 
-          <!-- Home 탭 -->
+      <!-- Home 탭 -->
 <section id="tab-home" class="tab-screen active">
   <div class="home-llm-large">
     <!-- LLM 입력 박스 -->
@@ -223,6 +224,83 @@
     </div>
   </div>
 </section>
+
+
+          <!-- Tactics 탭 -->
+          <section id="tab-tactics" class="tab-screen">
+            <div class="tactics-layout">
+              <!-- 왼쪽: 기본 전술 -->
+              <div class="tactics-section">
+                <h3>기본 전술 설정</h3>
+
+                <div class="tactics-row">
+                  <label for="tactics-pace">Pace</label>
+                  <input type="range" id="tactics-pace" min="-2" max="2" step="1" />
+                  <span id="tactics-pace-label" class="tactics-pace-label"></span>
+                </div>
+
+                <div class="tactics-row">
+                  <label for="tactics-offense-scheme">공격 스킴</label>
+                  <select id="tactics-offense-scheme">
+                    <option value="pace_space">Pace &amp; Space</option>
+                    <option value="five_out_motion">5-Out Motion</option>
+                    <option value="pnr_heavy">PnR Heavy</option>
+                    <option value="post_up_focus">Post-Up Focus</option>
+                    <option value="iso_heavy">Isolation Heavy</option>
+                    <option value="drive_kick">Drive &amp; Kick</option>
+                  </select>
+                </div>
+
+                <div class="tactics-row">
+                  <label for="tactics-defense-scheme">수비 스킴</label>
+                  <select id="tactics-defense-scheme">
+                    <option value="drop_coverage">Drop Coverage</option>
+                    <option value="switch_all">Switch Everything</option>
+                    <option value="hedge_recover">Hedge &amp; Recover</option>
+                    <option value="blitz_pnr">Blitz PnR</option>
+                    <option value="zone_2_3">2-3 Zone</option>
+                    <option value="full_court_press">Full-Court Press</option>
+                  </select>
+                </div>
+
+                <div class="tactics-row">
+                  <label for="tactics-rotation-size">로테이션 인원</label>
+                  <select id="tactics-rotation-size">
+                    <option value="6">6명</option>
+                    <option value="7">7명</option>
+                    <option value="8">8명</option>
+                    <option value="9">9명</option>
+                    <option value="10">10명</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- 오른쪽: 라인업 -->
+              <div class="tactics-section">
+                <h3>라인업 설정 (우리 팀)</h3>
+                <div id="tactics-team-label" class="tactics-team-label muted"></div>
+
+                <div class="tactics-lineup-header">
+                  <span>스타팅 5</span>
+                  <span>벤치</span>
+                </div>
+
+                <div class="tactics-lineup-container">
+                  <div id="tactics-starters" class="tactics-lineup-column"></div>
+                  <div id="tactics-bench" class="tactics-lineup-column"></div>
+                </div>
+
+                <div class="tactics-roster-list-wrapper">
+                  <h4>로스터에서 선택</h4>
+                  <div id="tactics-roster-list" class="tactics-roster-list">
+                    <!-- JS에서 로스터 버튼 렌더링 -->
+                  </div>
+                </div>
+
+                <div id="tactics-lineup-summary" class="tactics-lineup-summary muted"></div>
+              </div>
+            </div>
+          </section>
 
 
           <!-- Scores 탭 -->

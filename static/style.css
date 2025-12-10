@@ -198,6 +198,154 @@ button[disabled] { opacity:0.55; cursor:default; box-shadow:none; }
   box-shadow:0 6px 16px rgba(15,23,42,0.15);
   transform:translateY(-1px);
 }
+
+/* Tactics 탭 */
+.tactics-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 14px;
+}
+
+@media (max-width: 960px) {
+  .tactics-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tactics-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.tactics-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tactics-row label {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.tactics-pace-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.tactics-team-label {
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
+.tactics-lineup-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.tactics-lineup-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tactics-lineup-column {
+  background: var(--bg-soft);
+  border: 1px dashed var(--border-soft);
+  border-radius: 10px;
+  padding: 8px;
+  min-height: 120px;
+}
+
+.tactics-lineup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+
+.tactics-lineup-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9rem;
+}
+
+.tactics-lineup-meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.tactics-remove-btn {
+  box-shadow: none;
+}
+
+.tactics-roster-list-wrapper {
+  margin-top: 12px;
+}
+
+.tactics-roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tactics-roster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.tactics-roster-info .name {
+  font-weight: 600;
+}
+
+.tactics-roster-info .meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.tactics-roster-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tactics-roster-actions button.active {
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+}
+
+.tactics-roster-actions button.secondary {
+  box-shadow: none;
+}
+
+.tactics-lineup-summary {
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.small-text {
+  font-size: 0.85rem;
+}
 .team-card.selected {
   border-color:var(--accent);
   box-shadow:0 6px 18px rgba(200,16,46,0.35);

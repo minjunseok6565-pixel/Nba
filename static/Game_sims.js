@@ -70,6 +70,56 @@ function calcFatigueFactor(restDays) {
   return 1.05;                     // 4일 이상 푹 쉼
 }
 
+function buildUserTacticsPayload(teamId, fatigueFactor) {
+  const base = {
+    pace: 0,
+    offense_scheme: 'pace_space',
+    defense_scheme: 'drop_coverage',
+    rotation_size: 8,
+    lineup: { starters: [], bench: [] },
+    fatigue_factor: fatigueFactor
+  };
+
+  if (!teamId || !appState.tacticsByTeam) return base;
+  const tactics = appState.tacticsByTeam[teamId];
+  if (!tactics) return base;
+
+  const rotationSize = Math.min(10, Math.max(6, Number(tactics.rotation_size ?? 8)));
+  const starters = Array.isArray(tactics.lineup?.starters)
+    ? tactics.lineup.starters.slice(0, 5).map(pid => {
+        const num = Number(pid);
+        return Number.isNaN(num) ? pid : num;
+      })
+    : [];
+  const benchLimit = Math.max(0, rotationSize - starters.length);
+  const bench = Array.isArray(tactics.lineup?.bench)
+    ? tactics.lineup.bench.slice(0, benchLimit).map(pid => {
+        const num = Number(pid);
+        return Number.isNaN(num) ? pid : num;
+      })
+    : [];
+
+  return {
+    pace: Number.isFinite(Number(tactics.pace)) ? Number(tactics.pace) : 0,
+    offense_scheme: tactics.offense_scheme || base.offense_scheme,
+    defense_scheme: tactics.defense_scheme || base.defense_scheme,
+    rotation_size: rotationSize,
+    lineup: { starters, bench },
+    fatigue_factor: fatigueFactor
+  };
+}
+
+function buildOpponentTactics(fatigueFactor) {
+  return {
+    pace: 0,
+    offense_scheme: 'pace_space',
+    defense_scheme: 'drop_coverage',
+    rotation_size: 8,
+    lineup: { starters: [], bench: [] },
+    fatigue_factor: fatigueFactor
+  };
+}
+
 // 시즌 스케줄을 서버에서 받아오기 (신버전: /api/team-schedule/{teamId})
 async function generateSeasonSchedule(teamId) {
   const schedule = appState.cachedViews.schedule;
@@ -217,6 +267,10 @@ async function simulateGameProgress() {
   const homeFatigue = isUserHome ? fatigueFactor : 1.0;
   const awayFatigue = !isUserHome ? fatigueFactor : 1.0;
 
+  const userTacticsPayload = buildUserTacticsPayload(userTeam.id, fatigueFactor);
+  const homeTactics = isUserHome ? userTacticsPayload : buildOpponentTactics(homeFatigue);
+  const awayTactics = !isUserHome ? userTacticsPayload : buildOpponentTactics(awayFatigue);
+
   // 🔹 3) 우리 팀 경기 시뮬레이션 (/api/simulate-game)
   try {
     const res = await fetch("/api/simulate-game", {
@@ -225,16 +279,8 @@ async function simulateGameProgress() {
       body: JSON.stringify({
         home_team_id: homeTeam.id,
         away_team_id: awayTeam.id,
-        home_tactics: {
-          focus: "balanced",
-          pace: 0,
-          fatigue_factor: homeFatigue
-        },
-        away_tactics: {
-          focus: "balanced",
-          pace: 0,
-          fatigue_factor: awayFatigue
-        },
+        home_tactics: homeTactics,
+        away_tactics: awayTactics,
         game_date: gameDate
       })
     });
