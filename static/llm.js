@@ -94,6 +94,7 @@ async function sendToMainLLM() {
       apiKey: appState.apiKey,
       mainPrompt: (mainPromptTextarea?.value || '').trim(),
       userInput,
+      userMessage: userInput,
       context: JSON.stringify(context)
     };
 
@@ -245,3 +246,4 @@ async function loadRosterForTeam(teamId) {
     console.warn('로스터 요약 불러오기 오류:', e);
   }
 }
+
