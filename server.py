@@ -339,8 +339,6 @@ async def roster_summary(team_id: str):
             "overall": float(row.get("OVR", 0.0)) if "OVR" in team_df.columns else 0.0,
         })
 
-    players = sorted(players, key=lambda x: x["overall"], reverse=True)
-
     return {
         "team_id": team_id,
         "players": players[:12],

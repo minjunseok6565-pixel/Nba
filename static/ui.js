@@ -33,66 +33,21 @@ const tacticsOffenseSelect = document.getElementById('tactics-offense-scheme');
 const tacticsDefenseSelect = document.getElementById('tactics-defense-scheme');
 const tacticsRotationSelect = document.getElementById('tactics-rotation-size');
 const tacticsTeamLabel = document.getElementById('tactics-team-label');
-const tacticsStartersDiv = document.getElementById('tactics-starters');
-const tacticsBenchDiv = document.getElementById('tactics-bench');
+const tacticsStartersContainer = document.getElementById('tactics-starters');
+const tacticsBenchContainer = document.getElementById('tactics-bench');
 const tacticsRosterList = document.getElementById('tactics-roster-list');
 const tacticsLineupSummary = document.getElementById('tactics-lineup-summary');
 
-function createDefaultTacticsState() {
-  return {
-    pace: 0,
-    offense_scheme: 'pace_space',
-    defense_scheme: 'drop_coverage',
-    rotation_size: 8,
-    lineup: { starters: [], bench: [] }
-  };
-}
-
-function clampRotationSize(val) {
-  const num = Number(val ?? 8);
-  if (Number.isNaN(num)) return 8;
-  return Math.min(10, Math.max(6, num));
-}
-
-function ensureTacticsForTeam(teamId) {
-  if (!teamId) return null;
-  if (!appState.tacticsByTeam[teamId]) {
-    appState.tacticsByTeam[teamId] = createDefaultTacticsState();
-  }
-  return appState.tacticsByTeam[teamId];
-}
-
-function normalizePlayerId(pid) {
-  const asNumber = Number(pid);
-  return Number.isNaN(asNumber) ? pid : asNumber;
-}
-
-function applyRosterToTacticsIfNeeded(teamId) {
-  const tactics = ensureTacticsForTeam(teamId);
-  const roster = appState.rosters[teamId]?.players || [];
-  if (!tactics || !roster.length) return;
-
-  const lineup = tactics.lineup || {};
-  const hasLineup = (lineup.starters && lineup.starters.length) || (lineup.bench && lineup.bench.length);
-  if (hasLineup) return;
-
-  const rotationSize = clampRotationSize(tactics.rotation_size);
-  const starters = roster.slice(0, 5).map(p => normalizePlayerId(p.player_id));
-  const benchSlots = Math.max(0, rotationSize - starters.length);
-  const bench = roster.slice(5, 5 + benchSlots).map(p => normalizePlayerId(p.player_id));
-  tactics.lineup = { starters, bench };
-}
-
-function findPlayerInRoster(teamId, playerId) {
-  const roster = appState.rosters[teamId]?.players || [];
-  return roster.find(p => String(p.player_id) === String(playerId));
-}
-
-function formatPaceLabel(val) {
-  const num = Number(val ?? 0);
-  if (num > 0) return `+${num}`;
-  if (num < 0) return `${num}`;
-  return '0 (기본)';
+function updateTacticsPaceLabel() {
+  if (!tacticsPaceInput || !tacticsPaceLabel) return;
+  const v = Number(tacticsPaceInput.value || 0);
+  let text = '';
+  if (v === -2) text = '매우 느림';
+  else if (v === -1) text = '느림';
+  else if (v === 0) text = '보통';
+  else if (v === 1) text = '빠름';
+  else if (v === 2) text = '매우 빠름';
+  tacticsPaceLabel.textContent = `${v} (${text})`;
 }
 
 // 메인 탭 요소
@@ -223,9 +178,12 @@ function selectTeam(teamId) {
     weeklyNews: { items: [], lastLoaded: null }
   };
   appState.rosters = {};
-  appState.tacticsByTeam = { [team.id]: createDefaultTacticsState() };
+  appState.tacticsByTeam = appState.tacticsByTeam || {};
   appState.chatHistory = [];
   appState.firstMessageShownTeams = appState.firstMessageShownTeams || {};
+
+  // ✅ 팀별 전술 기본값 준비
+  getOrCreateTacticsForTeam(team.id);
 
   // 선택 시점에 로스터 요약을 미리 불러오기(서버에서)
   loadRosterForTeam(team.id);
@@ -271,38 +229,42 @@ navTabs.forEach(btn => {
 
 if (tacticsPaceInput) {
   tacticsPaceInput.addEventListener('input', () => {
-    const teamId = appState.selectedTeam?.id;
-    const tactics = ensureTacticsForTeam(teamId);
-    if (!tactics) return;
-    tactics.pace = Number(tacticsPaceInput.value);
-    tacticsPaceLabel.textContent = formatPaceLabel(tactics.pace);
+    updateTacticsPaceLabel();
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    tactics.pace = Number(tacticsPaceInput.value || 0);
   });
 }
 
-[tacticsOffenseSelect, tacticsDefenseSelect].forEach(selectEl => {
-  if (!selectEl) return;
-  selectEl.addEventListener('change', () => {
-    const teamId = appState.selectedTeam?.id;
-    const tactics = ensureTacticsForTeam(teamId);
-    if (!tactics) return;
-    if (selectEl === tacticsOffenseSelect) tactics.offense_scheme = selectEl.value;
-    if (selectEl === tacticsDefenseSelect) tactics.defense_scheme = selectEl.value;
+if (tacticsOffenseSelect) {
+  tacticsOffenseSelect.addEventListener('change', () => {
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    tactics.offenseScheme = tacticsOffenseSelect.value;
   });
-});
+}
+
+if (tacticsDefenseSelect) {
+  tacticsDefenseSelect.addEventListener('change', () => {
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    tactics.defenseScheme = tacticsDefenseSelect.value;
+  });
+}
 
 if (tacticsRotationSelect) {
   tacticsRotationSelect.addEventListener('change', () => {
-    const teamId = appState.selectedTeam?.id;
-    const tactics = ensureTacticsForTeam(teamId);
-    if (!tactics) return;
-    const rotationSize = clampRotationSize(tacticsRotationSelect.value);
-    tactics.rotation_size = rotationSize;
-    tacticsRotationSelect.value = String(rotationSize);
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    tactics.rotationSize = Number(tacticsRotationSelect.value || 9);
 
-    const starters = tactics.lineup?.starters || [];
-    const bench = (tactics.lineup?.bench || []).slice(0, Math.max(0, rotationSize - starters.length));
-    tactics.lineup = { starters, bench };
-    renderTacticsTab();
+    const rosterData = appState.rosters[team.id];
+    const players = (rosterData && rosterData.players) || [];
+    renderTacticsLineup(players, tactics);
   });
 }
 
@@ -319,19 +281,19 @@ function switchTab(tab) {
     }
   });
 
-  let title = '구단 운영';
+  let title = '';
   switch (tab) {
     case 'home':
-      title = '구단 운영';
+      title = '구단 운영 / 홈';
+      break;
+    case 'tactics':
+      title = '전술 설정 (Tactics)';
       break;
     case 'scores':
       title = '경기 결과';
       break;
     case 'schedule':
       title = '시즌 일정';
-      break;
-    case 'tactics':
-      title = '전술 설정';
       break;
     case 'standings':
       title = '리그 순위';
@@ -352,8 +314,6 @@ function switchTab(tab) {
     renderScores();
   } else if (tab === 'schedule') {
     renderSchedule();
-  } else if (tab === 'tactics') {
-    renderTacticsTab();
   } else if (tab === 'standings') {
     renderStandings();
   } else if (tab === 'stats') {
@@ -362,6 +322,8 @@ function switchTab(tab) {
     renderTeams();
   } else if (tab === 'news') {
     renderNews();
+  } else if (tab === 'tactics') {
+    renderTacticsTab();
   }
 }
 
@@ -442,191 +404,155 @@ function renderAllTabs() {
   renderNews();
 }
 
-function renderTacticsTab() {
-  if (!tacticsRosterList || !tacticsTeamLabel) return;
-
+async function renderTacticsTab() {
   const team = appState.selectedTeam;
   if (!team) {
-    tacticsTeamLabel.textContent = '팀을 먼저 선택하세요.';
-    tacticsRosterList.innerHTML = '<div class="muted">팀이 선택되지 않았습니다.</div>';
-    tacticsStartersDiv.innerHTML = '';
-    tacticsBenchDiv.innerHTML = '';
-    tacticsLineupSummary.textContent = '';
+    if (tacticsTeamLabel) {
+      tacticsTeamLabel.textContent = '먼저 팀 선택 화면에서 팀을 선택해주세요.';
+    }
+    if (tacticsRosterList) tacticsRosterList.innerHTML = '';
+    if (tacticsStartersContainer) tacticsStartersContainer.innerHTML = '';
+    if (tacticsBenchContainer) tacticsBenchContainer.innerHTML = '';
+    if (tacticsLineupSummary) tacticsLineupSummary.textContent = '';
     return;
   }
 
   const teamId = team.id;
-  const tactics = ensureTacticsForTeam(teamId);
-  const rotationSize = clampRotationSize(tactics.rotation_size);
-  tactics.rotation_size = rotationSize;
+  const tactics = getOrCreateTacticsForTeam(teamId);
 
-  tacticsTeamLabel.textContent = `${team.name} (${team.id})`;
+  if (tacticsTeamLabel) {
+    tacticsTeamLabel.textContent = `${team.name} (${team.id})`;
+  }
 
   if (tacticsPaceInput) {
     tacticsPaceInput.value = tactics.pace ?? 0;
-  }
-  if (tacticsPaceLabel) {
-    tacticsPaceLabel.textContent = formatPaceLabel(tactics.pace);
+    updateTacticsPaceLabel();
   }
   if (tacticsOffenseSelect) {
-    tacticsOffenseSelect.value = tactics.offense_scheme || 'pace_space';
+    tacticsOffenseSelect.value = tactics.offenseScheme || 'pace_space';
   }
   if (tacticsDefenseSelect) {
-    tacticsDefenseSelect.value = tactics.defense_scheme || 'drop_coverage';
+    tacticsDefenseSelect.value = tactics.defenseScheme || 'drop_coverage';
   }
   if (tacticsRotationSelect) {
-    tacticsRotationSelect.value = String(rotationSize);
+    tacticsRotationSelect.value = String(tactics.rotationSize || 9);
   }
 
+  await loadRosterForTeam(teamId);
   const rosterData = appState.rosters[teamId];
-  if (!rosterData) {
-    tacticsRosterList.innerHTML = '<div class="muted">로스터를 불러오는 중입니다...</div>';
-    loadRosterForTeam(teamId).then(() => {
-      applyRosterToTacticsIfNeeded(teamId);
-      renderTacticsTab();
-    });
-    return;
-  }
+  const players = (rosterData && rosterData.players) || [];
 
-  applyRosterToTacticsIfNeeded(teamId);
-
-  const lineup = tactics.lineup || { starters: [], bench: [] };
-  renderLineupColumn(tacticsStartersDiv, lineup.starters || [], teamId);
-  renderLineupColumn(tacticsBenchDiv, lineup.bench || [], teamId);
-  renderRosterButtons(teamId, rosterData.players || [], lineup, rotationSize);
-
-  const totalUsed = (lineup.starters?.length || 0) + (lineup.bench?.length || 0);
-  tacticsLineupSummary.textContent = `스타팅 ${lineup.starters?.length || 0}/5 · 전체 ${totalUsed}/${rotationSize}명`;
+  renderTacticsLineup(players, tactics);
 }
 
-function renderLineupColumn(container, playerIds, teamId) {
-  if (!container) return;
-  container.innerHTML = '';
-  if (!playerIds.length) {
-    const empty = document.createElement('div');
-    empty.className = 'muted small-text';
-    empty.textContent = '비어 있음';
-    container.appendChild(empty);
-    return;
-  }
+function renderTacticsLineup(players, tactics) {
+  if (!tacticsStartersContainer || !tacticsBenchContainer || !tacticsRosterList) return;
 
-  playerIds.forEach(pid => {
-    const player = findPlayerInRoster(teamId, pid);
-    const row = document.createElement('div');
-    row.className = 'tactics-lineup-item';
+  const starters = new Set(tactics.starters || []);
+  const bench = new Set(tactics.bench || []);
 
-    const name = player ? `${player.name} (${player.pos || ''})` : pid;
-    const meta = player?.overall != null ? `OVR ${player.overall}` : '';
+  tacticsStartersContainer.innerHTML = '';
+  tacticsBenchContainer.innerHTML = '';
 
-    const text = document.createElement('div');
-    text.className = 'tactics-lineup-text';
-    text.innerHTML = `<span>${name}</span><span class="tactics-lineup-meta">${meta}</span>`;
+  const makeTag = (p) => {
+    const div = document.createElement('div');
+    div.className = 'tactics-player-tag';
+    div.textContent = `${p.name} (${p.pos}, OVR ${p.overall})`;
+    return div;
+  };
 
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'secondary small tactics-remove-btn';
-    removeBtn.textContent = '제거';
-    removeBtn.addEventListener('click', () => removeFromLineup(teamId, pid));
-
-    row.appendChild(text);
-    row.appendChild(removeBtn);
-    container.appendChild(row);
+  players.forEach(p => {
+    if (starters.has(p.player_id)) {
+      tacticsStartersContainer.appendChild(makeTag(p));
+    } else if (bench.has(p.player_id)) {
+      tacticsBenchContainer.appendChild(makeTag(p));
+    }
   });
-}
 
-function renderRosterButtons(teamId, roster, lineup, rotationSize) {
-  if (!tacticsRosterList) return;
   tacticsRosterList.innerHTML = '';
-
-  if (!roster.length) {
-    tacticsRosterList.innerHTML = '<div class="muted">로스터 데이터가 없습니다.</div>';
-    return;
-  }
-
-  roster.forEach(p => {
+  players.forEach(p => {
     const row = document.createElement('div');
     row.className = 'tactics-roster-row';
 
     const info = document.createElement('div');
     info.className = 'tactics-roster-info';
-    info.innerHTML = `<div class="name">${p.name}</div><div class="meta">${p.pos || '-'} · OVR ${p.overall ?? '-'}</div>`;
+    info.textContent = `${p.name} (${p.pos}, OVR ${p.overall})`;
 
     const actions = document.createElement('div');
     actions.className = 'tactics-roster-actions';
 
-    const isStarter = (lineup.starters || []).includes(p.player_id);
-    const isBench = (lineup.bench || []).includes(p.player_id);
+    const btnStarter = document.createElement('button');
+    btnStarter.type = 'button';
+    btnStarter.textContent = '스타팅';
+    btnStarter.className = 'tactics-role-button';
 
-    const startBtn = document.createElement('button');
-    startBtn.type = 'button';
-    startBtn.className = `small ${isStarter ? 'active' : 'secondary'}`;
-    startBtn.textContent = '스타팅';
-    startBtn.addEventListener('click', () => updateLineupForTeam(teamId, p.player_id, 'starters'));
+    const btnBench = document.createElement('button');
+    btnBench.type = 'button';
+    btnBench.textContent = '벤치';
+    btnBench.className = 'tactics-role-button';
 
-    const benchBtn = document.createElement('button');
-    benchBtn.type = 'button';
-    benchBtn.className = `small ${isBench ? 'active' : 'secondary'}`;
-    benchBtn.textContent = '벤치';
-    benchBtn.addEventListener('click', () => updateLineupForTeam(teamId, p.player_id, 'bench', rotationSize));
+    const refreshButtonClasses = () => {
+      btnStarter.classList.toggle('selected', starters.has(p.player_id));
+      btnBench.classList.toggle('selected', bench.has(p.player_id));
+    };
+    refreshButtonClasses();
 
-    actions.appendChild(startBtn);
-    actions.appendChild(benchBtn);
+    btnStarter.addEventListener('click', () => {
+      const rotationSize = tactics.rotationSize || 9;
+
+      if (starters.has(p.player_id)) {
+        starters.delete(p.player_id);
+      } else {
+        if (starters.size >= 5) {
+          alert('스타팅은 최대 5명까지 설정할 수 있습니다.');
+          return;
+        }
+        starters.add(p.player_id);
+        bench.delete(p.player_id);
+      }
+
+      if (starters.size + bench.size > rotationSize) {
+        alert(`로테이션 인원(${rotationSize}명)을 초과했습니다.`);
+        starters.delete(p.player_id);
+      } else {
+        tactics.starters = Array.from(starters);
+        tactics.bench = Array.from(bench);
+        renderTacticsLineup(players, tactics);
+      }
+    });
+
+    btnBench.addEventListener('click', () => {
+      const rotationSize = tactics.rotationSize || 9;
+
+      if (bench.has(p.player_id)) {
+        bench.delete(p.player_id);
+      } else {
+        if (starters.size + bench.size >= rotationSize) {
+          alert(`로테이션 인원(${rotationSize}명)을 초과했습니다.`);
+          return;
+        }
+        bench.add(p.player_id);
+        starters.delete(p.player_id);
+      }
+
+      tactics.starters = Array.from(starters);
+      tactics.bench = Array.from(bench);
+      renderTacticsLineup(players, tactics);
+    });
+
+    actions.appendChild(btnStarter);
+    actions.appendChild(btnBench);
 
     row.appendChild(info);
     row.appendChild(actions);
     tacticsRosterList.appendChild(row);
   });
-}
 
-function updateLineupForTeam(teamId, playerId, target) {
-  const tactics = ensureTacticsForTeam(teamId);
-  if (!tactics) return;
-  const pid = normalizePlayerId(playerId);
-  const rotationSize = clampRotationSize(tactics.rotation_size);
-  let starters = [...(tactics.lineup?.starters || [])].map(normalizePlayerId);
-  let bench = [...(tactics.lineup?.bench || [])].map(normalizePlayerId);
-
-  const wasStarter = starters.includes(pid);
-  const wasBench = bench.includes(pid);
-
-  starters = starters.filter(id => id !== pid);
-  bench = bench.filter(id => id !== pid);
-
-  if (target === 'starters') {
-    if (!wasStarter) {
-      if (starters.length >= 5) {
-        alert('스타팅 5는 최대 5명까지만 설정할 수 있습니다.');
-        return;
-      }
-      starters.push(pid);
-    }
-  } else if (target === 'bench') {
-    if (!wasBench) {
-      if (starters.length + bench.length >= rotationSize) {
-        alert(`로테이션 인원(${rotationSize}명)을 초과할 수 없습니다.`);
-        return;
-      }
-      bench.push(pid);
-    }
+  if (tacticsLineupSummary) {
+    const total = starters.size + bench.size;
+    tacticsLineupSummary.textContent =
+      `현재 로테이션: 스타팅 ${starters.size}명 + 벤치 ${bench.size}명 = 총 ${total}명 (설정값: ${tactics.rotationSize}명)`;
   }
-
-  const allowedBench = Math.max(0, rotationSize - starters.length);
-  bench = bench.slice(0, allowedBench);
-
-  tactics.lineup = { starters, bench };
-  renderTacticsTab();
-}
-
-function removeFromLineup(teamId, playerId) {
-  const tactics = ensureTacticsForTeam(teamId);
-  if (!tactics) return;
-  const pid = normalizePlayerId(playerId);
-  const lineup = tactics.lineup || { starters: [], bench: [] };
-  tactics.lineup = {
-    starters: (lineup.starters || []).map(normalizePlayerId).filter(id => id !== pid),
-    bench: (lineup.bench || []).map(normalizePlayerId).filter(id => id !== pid)
-  };
-  renderTacticsTab();
 }
 
 // Scores 탭 렌더링
