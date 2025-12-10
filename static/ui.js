@@ -52,6 +52,14 @@ const sidebarLastGame = document.getElementById('sidebarLastGame');
 const seasonDateLabel = document.getElementById('seasonDateLabel');
 const progressLabel = document.getElementById('progressLabel');
 
+// 프롬프트 팝오버 요소
+const promptToggle = document.getElementById('promptToggle');
+const promptPopover = document.getElementById('promptPopover');
+const promptTabButtons = document.querySelectorAll('.prompt-tab-btn');
+const promptTabContents = document.querySelectorAll('.prompt-tab-content');
+const lorebookFileInput = document.getElementById('lorebookFile');
+const lorebookStatus = document.getElementById('lorebookStatus');
+
 function showScreen(name) {
   screenApiKey.style.display = name === 'apiKey' ? 'block' : 'none';
   screenTeamSelect.style.display = name === 'teamSelect' ? 'block' : 'none';
@@ -242,6 +250,74 @@ function switchTab(tab) {
   } else if (tab === 'news') {
     renderNews();
   }
+}
+
+// 프롬프트 팝오버 토글
+function togglePromptPopover(forceOpen) {
+  if (!promptPopover) return;
+  const willOpen =
+    typeof forceOpen === 'boolean'
+      ? forceOpen
+      : !promptPopover.classList.contains('open');
+  promptPopover.classList.toggle('open', willOpen);
+  if (promptToggle) {
+    promptToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  }
+}
+
+function activatePromptTab(tabName) {
+  promptTabButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.ptab === tabName);
+  });
+  promptTabContents.forEach(content => {
+    content.classList.toggle(
+      'active',
+      content.dataset.ptabContent === tabName
+    );
+  });
+}
+
+if (promptToggle && promptPopover) {
+  promptToggle.addEventListener('click', e => {
+    e.stopPropagation();
+    togglePromptPopover();
+  });
+
+  document.addEventListener('click', e => {
+    if (!promptPopover.classList.contains('open')) return;
+    if (
+      !promptPopover.contains(e.target) &&
+      !promptToggle.contains(e.target)
+    ) {
+      togglePromptPopover(false);
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && promptPopover.classList.contains('open')) {
+      togglePromptPopover(false);
+    }
+  });
+}
+
+promptTabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    activatePromptTab(btn.dataset.ptab);
+  });
+});
+
+if (lorebookFileInput && lorebookStatus) {
+  lorebookFileInput.addEventListener('change', () => {
+    const file = lorebookFileInput.files?.[0];
+    if (file) {
+      const sizeKb = (file.size / 1024).toFixed(1);
+      lorebookStatus.textContent = `${file.name} (${sizeKb} KB) 업로드 준비됨`;
+      lorebookStatus.classList.remove('muted');
+    } else {
+      lorebookStatus.textContent = '아직 업로드된 파일이 없습니다.';
+      lorebookStatus.classList.add('muted');
+    }
+  });
 }
 
 function renderAllTabs() {
