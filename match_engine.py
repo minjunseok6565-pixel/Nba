@@ -53,6 +53,7 @@ class Player:
 
     # usage(공격 비중) 기본 가중치
     usage_weight: float = 1.0
+    desired_minutes: float = 0.0
 
     def inc(self, key: str, val: float = 1.0) -> None:
         self.stats[key] = self.stats.get(key, 0.0) + val
@@ -93,12 +94,19 @@ class Team:
         base_tactics = {
             "pace": 0,                         # -2 ~ +2
             "offense_scheme": "pace_space",    # 6개 중 하나
+            "offense_secondary_scheme": "pace_space",
+            "offense_primary_weight": 5,
+            "offense_secondary_weight": 5,
             "defense_scheme": "drop_coverage", # 6개 중 하나
-            "rotation_size": 8,                # 6~10
+            "defense_secondary_scheme": "drop_coverage",
+            "defense_primary_weight": 5,
+            "defense_secondary_weight": 5,
+            "rotation_size": 9,                # 6~10
             "lineup": {
                 "starters": [],
                 "bench": [],
             },
+            "minutes": {},
             "fatigue_factor": 1.0,             # 팀 컨디션 (0.9 ~ 1.05 정도)
         }
         if tactics:
@@ -109,7 +117,7 @@ class Team:
         lineup = self.tactics.get("lineup") or {}
         starter_ids = lineup.get("starters") or []
         bench_ids = lineup.get("bench") or []
-        rotation_size = int(self.tactics.get("rotation_size", 8))
+        rotation_size = int(self.tactics.get("rotation_size", 9))
         rotation_size = max(6, min(10, rotation_size))
 
         by_id = {p.player_id: p for p in all_players}
@@ -152,8 +160,40 @@ class Team:
             base *= 1.0 + (score - 80.0) / 100.0  # 80 이상이면 플러스
             p.usage_weight = max(0.3, base)
 
+        self._apply_minutes(starters, bench, rotation_players, rotation_size)
         self.players = all_players
         self.rotation_players = rotation_players
+
+    def _apply_minutes(self, starters: List[Player], bench: List[Player], rotation_players: List[Player], rotation_size: int) -> None:
+        minutes_cfg = self.tactics.get("minutes") or {}
+        defaults = self._default_minutes(rotation_size)
+
+        def _get_minutes(pid: int, default_val: float) -> float:
+            for key in (pid, str(pid)):
+                if key in minutes_cfg:
+                    try:
+                        return float(minutes_cfg[key])
+                    except (TypeError, ValueError):
+                        continue
+            return float(default_val)
+
+        for p in starters:
+            p.desired_minutes = _get_minutes(p.player_id, defaults["starter"])
+        for p in bench:
+            p.desired_minutes = _get_minutes(p.player_id, defaults["bench"])
+        for p in rotation_players:
+            if p.desired_minutes < 0:
+                p.desired_minutes = 0.0
+
+    def _default_minutes(self, rotation_size: int) -> Dict[str, float]:
+        mapping = {
+            6: {"starter": 41.0, "bench": 35.0},
+            7: {"starter": 36.0, "bench": 30.0},
+            8: {"starter": 33.0, "bench": 25.0},
+            9: {"starter": 28.0, "bench": 25.0},
+            10: {"starter": 25.0, "bench": 23.0},
+        }
+        return mapping.get(rotation_size, {"starter": 32.0, "bench": 22.0})
 
     # 능력치 집계
     def _build_ratings(self, row: pd.Series) -> Dict[str, float]:
@@ -270,14 +310,20 @@ class MatchEngine:
         game_minutes = 48.0
         minutes_per_possession = game_minutes * 5.0 / poss
 
+        minute_shares = {
+            self.home.team_id: self._build_minute_shares(self.home),
+            self.away.team_id: self._build_minute_shares(self.away),
+        }
+
         for i in range(poss):
             next_offense = self._simulate_possession(offense, defense)
 
-            # 간단한 분배: 로테이션 인원 비율대로 분배
+            # 사전에 지정한 출전 시간을 비율로 환산하여 분배
             for team in (offense, defense):
-                total_usage = sum(p.usage_weight for p in team.rotation_players)
+                shares = minute_shares.get(team.team_id) or {}
+                fallback = 1.0 / len(team.rotation_players) if team.rotation_players else 0
                 for p in team.rotation_players:
-                    share = p.usage_weight / total_usage if total_usage > 0 else 1.0 / len(team.rotation_players)
+                    share = shares.get(p.player_id, fallback)
                     p.inc("MIN", minutes_per_possession * share)
 
             offense = next_offense
@@ -323,27 +369,58 @@ class MatchEngine:
         poss = int(base * pace_factor * stamina_factor)
         return max(80, min(120, poss))
 
+    def _build_minute_shares(self, team: Team) -> Dict[int, float]:
+        total_minutes = sum(max(0.0, p.desired_minutes) for p in team.rotation_players)
+        if total_minutes <= 0:
+            if not team.rotation_players:
+                return {}
+            uniform = 1.0 / len(team.rotation_players)
+            return {p.player_id: uniform for p in team.rotation_players}
+        return {p.player_id: max(0.0, p.desired_minutes) / total_minutes for p in team.rotation_players}
+
+    def _pick_scheme(self, team: Team, kind: str) -> str:
+        primary_key = f"{kind}_scheme"
+        secondary_key = f"{kind}_secondary_scheme"
+        primary_default = "pace_space" if kind == "offense" else "drop_coverage"
+
+        primary = team.tactics.get(primary_key, primary_default)
+        secondary = team.tactics.get(secondary_key)
+        if not secondary or secondary in ("none", ""):
+            return primary
+
+        prim_w = max(0.0, float(team.tactics.get(f"{kind}_primary_weight", 10.0)))
+        sec_w = max(0.0, float(team.tactics.get(f"{kind}_secondary_weight", 0.0)))
+        if prim_w < sec_w:
+            prim_w = sec_w
+
+        total = prim_w + sec_w
+        if total <= 0:
+            return primary
+
+        r = self.rng.random() * total
+        return primary if r < prim_w else secondary
+
     # -----------------------------
     # 포제션 1개 시뮬
     # -----------------------------
     def _simulate_possession(self, offense: Team, defense: Team) -> Team:
-        off_scheme = offense.tactics.get("offense_scheme", "pace_space")
-        def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
+        off_scheme = self._pick_scheme(offense, "offense")
+        def_scheme = self._pick_scheme(defense, "defense")
 
         # 1) 초기 턴오버 (프레스, 트랩, 핸들링)
-        if self._maybe_early_turnover(offense, defense):
+        if self._maybe_early_turnover(offense, defense, def_scheme):
             return defense
 
         # 2) 플레이 타입 선택 (iso / pnr / post / drive_kick / motion / generic)
-        play_type = self._pick_play_type(offense, defense)
+        play_type = self._pick_play_type(offense, defense, off_scheme)
 
         # 3) 주 공격수(에이스, 볼 핸들러, 롤맨 등) 선택
-        shooter, secondary = self._pick_actors(offense, play_type)
+        shooter, secondary = self._pick_actors(offense, play_type, off_scheme)
 
         # 4) 샷 타입 선별 (rim/mid/three) + 성공 여부 + 파울 여부
-        shot_type = self._pick_shot_type(offense, defense, play_type)
+        shot_type = self._pick_shot_type(offense, defense, play_type, off_scheme, def_scheme)
         made, is_three, foul_drawn, ft_count = self._resolve_shot(
-            offense, defense, shooter, secondary, play_type, shot_type
+            offense, defense, shooter, secondary, play_type, shot_type, def_scheme
         )
 
         # 5) 자유투
@@ -362,21 +439,20 @@ class MatchEngine:
             shooter.inc("3PA", 1)
 
         if made:
-            self._maybe_assist(offense, defense, shooter, play_type)
+            self._maybe_assist(offense, defense, shooter, play_type, off_scheme)
             return defense
         if foul_drawn:
             return defense
 
-        reb_team = self._resolve_rebound(offense, defense)
+        reb_team = self._resolve_rebound(offense, defense, def_scheme)
         return reb_team
 
     # -----------------------------
     # 초기 턴오버 (프레스/트랩 등)
     # -----------------------------
-    def _maybe_early_turnover(self, offense: Team, defense: Team) -> bool:
+    def _maybe_early_turnover(self, offense: Team, defense: Team, def_scheme: str) -> bool:
         off_pm = offense.avg("Playmaking")
         def_def = defense.avg("Defense")
-        def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
 
         base_tov = 0.11  # 기본 11%
         pm_factor = (off_pm - 75.0) / 250.0
@@ -430,8 +506,7 @@ class MatchEngine:
     # -----------------------------
     # 플레이 타입 선택
     # -----------------------------
-    def _pick_play_type(self, offense: Team, defense: Team) -> str:
-        scheme = offense.tactics.get("offense_scheme", "pace_space")
+    def _pick_play_type(self, offense: Team, defense: Team, scheme: str) -> str:
         # 기본 가중치
         w = {
             "iso": 0.10,
@@ -508,9 +583,8 @@ class MatchEngine:
     # -----------------------------
     # 공격수 / 세컨더리 액터 선택
     # -----------------------------
-    def _pick_actors(self, offense: Team, play_type: str) -> (Player, Optional[Player]):
+    def _pick_actors(self, offense: Team, play_type: str, scheme: str) -> (Player, Optional[Player]):
         players = offense.rotation_players
-        scheme = offense.tactics.get("offense_scheme", "pace_space")
 
         # usage 기반 기본 가중치
         weights = []
@@ -577,9 +651,7 @@ class MatchEngine:
     # -----------------------------
     # 샷 타입 선택 (rim/mid/three)
     # -----------------------------
-    def _pick_shot_type(self, offense: Team, defense: Team, play_type: str) -> str:
-        off_scheme = offense.tactics.get("offense_scheme", "pace_space")
-        def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
+    def _pick_shot_type(self, offense: Team, defense: Team, play_type: str, off_scheme: str, def_scheme: str) -> str:
 
         # 기본 분포
         dist = {"rim": 0.35, "mid": 0.25, "three": 0.40}
@@ -656,8 +728,8 @@ class MatchEngine:
         secondary: Optional[Player],
         play_type: str,
         shot_type: str,
+        def_scheme: str,
     ) -> (bool, bool, bool, int):
-        def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
 
         # 공격 레이팅
         if shot_type == "three":
@@ -797,10 +869,9 @@ class MatchEngine:
     # -----------------------------
     # 리바운드
     # -----------------------------
-    def _resolve_rebound(self, offense: Team, defense: Team) -> Team:
+    def _resolve_rebound(self, offense: Team, defense: Team, def_scheme: str) -> Team:
         off_reb = offense.avg("Offensive Rebound")
         def_reb = defense.avg("Defensive Rebound")
-        def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
 
         # 기본: 수비 75%
         base_def_share = 0.75 + (def_reb - off_reb) / 400.0
@@ -845,14 +916,13 @@ class MatchEngine:
     # -----------------------------
     # 어시스트
     # -----------------------------
-    def _maybe_assist(self, offense: Team, defense: Team, shooter: Player, play_type: str) -> None:
+    def _maybe_assist(self, offense: Team, defense: Team, shooter: Player, play_type: str, scheme: str) -> None:
         pm_team = offense.avg("Playmaking")
         help_def = defense.avg("Help Defense IQ")
 
         base_ast = 0.55 + (pm_team - help_def) / 300.0
 
         # 전술 보정
-        scheme = offense.tactics.get("offense_scheme", "pace_space")
         if scheme in ("pace_space", "five_out_motion", "drive_kick", "pnr_heavy"):
             base_ast += 0.08
         elif scheme == "iso_heavy":

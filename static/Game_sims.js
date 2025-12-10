@@ -80,12 +80,19 @@ function buildTacticsForTeam(teamId, fatigueFactor) {
     return {
       pace: tactics.pace ?? 0,
       offense_scheme: tactics.offenseScheme || 'pace_space',
+      offense_secondary_scheme: tactics.offenseSecondaryScheme || 'none',
+      offense_primary_weight: tactics.offensePrimaryWeight ?? 5,
+      offense_secondary_weight: tactics.offenseSecondaryWeight ?? 5,
       defense_scheme: tactics.defenseScheme || 'drop_coverage',
+      defense_secondary_scheme: tactics.defenseSecondaryScheme || 'none',
+      defense_primary_weight: tactics.defensePrimaryWeight ?? 5,
+      defense_secondary_weight: tactics.defenseSecondaryWeight ?? 5,
       rotation_size: tactics.rotationSize || 9,
       lineup: {
         starters: tactics.starters || [],
         bench: tactics.bench || []
       },
+      minutes: tactics.minutes || {},
       fatigue_factor: fatigueFactor
     };
   }

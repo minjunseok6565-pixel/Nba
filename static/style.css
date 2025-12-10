@@ -1196,3 +1196,48 @@ tr:last-child td { border-bottom:none; }
   margin-top: 6px;
   font-size: 0.8rem;
 }
+
+.tactics-minutes-panel {
+  margin-top: 14px;
+  background: #0b1220;
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.tactics-minutes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tactics-minute-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.tactics-minute-row .player-name {
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.tactics-minute-row .player-role {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  min-width: 58px;
+  text-align: center;
+}
+
+.tactics-minute-input {
+  width: 70px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #020617;
+  color: #e5e7eb;
+}

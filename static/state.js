@@ -76,10 +76,17 @@ function getDefaultTactics() {
   return {
     pace: 0,
     offenseScheme: 'pace_space',
+    offenseSecondaryScheme: 'pace_space',
+    offensePrimaryWeight: 5,
+    offenseSecondaryWeight: 5,
     defenseScheme: 'drop_coverage',
+    defenseSecondaryScheme: 'drop_coverage',
+    defensePrimaryWeight: 5,
+    defenseSecondaryWeight: 5,
     rotationSize: 9,
     starters: [],
-    bench: []
+    bench: [],
+    minutes: {}
   };
 }
 
