@@ -1,5 +1,23 @@
 // LLM 관련 상태
 let isLLMLoading = false;
+let isSubLLMLoading = false;
+const subPromptTextarea = document.getElementById('subPromptTextarea');
+
+function setLLMLoadingStatus(kind, loading, message) {
+  if (!llmStatus) return;
+
+  if (loading) {
+    llmStatus.textContent = message || 'LLM 처리 중...';
+    if (homeLLMOutput && kind === 'main') {
+      homeLLMOutput.textContent = llmStatus.textContent;
+    }
+  } else {
+    // 메인/서브 둘 다 끝났을 때만 비움
+    if (!isLLMLoading && !isSubLLMLoading) {
+      llmStatus.textContent = '';
+    }
+  }
+}
 
 // 퍼스트 메시지 로딩
 function showFirstMessageForSelectedTeam() {
@@ -61,7 +79,7 @@ async function sendToMainLLM() {
   }
 
   isLLMLoading = true;
-  llmStatus.textContent = 'LLM 호출 중...';
+  setLLMLoadingStatus('main', true, 'LLM 응답 생성 중...');
   btnSendToLLM.disabled = true;
 
   try {
@@ -74,11 +92,12 @@ async function sendToMainLLM() {
 
     const payload = {
       apiKey: appState.apiKey,
-      userMessage: userInput,
-      context
+      mainPrompt: (mainPromptTextarea?.value || '').trim(),
+      userInput,
+      context: JSON.stringify(context)
     };
 
-    const res = await fetch('/api/main-llm', {
+    const res = await fetch('/api/chat-main', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -91,7 +110,7 @@ async function sendToMainLLM() {
     }
 
     const data = await res.json();
-    const answer = (data.answer || '').trim();
+    const answer = (data.reply || data.answer || '').trim();
     homeLLMOutput.textContent = answer || '(빈 응답)';
 
     // 어시스턴트 응답도 히스토리에 추가
@@ -104,7 +123,7 @@ async function sendToMainLLM() {
     alert('LLM 호출 중 오류가 발생했습니다.');
   } finally {
     isLLMLoading = false;
-    llmStatus.textContent = '';
+    setLLMLoadingStatus('main', false);
     btnSendToLLM.disabled = false;
     homeUserInput.value = '';
   }
@@ -152,14 +171,16 @@ async function callSubLLMStateUpdate(engineOutput) {
   if (!appState.apiKey) return;
 
   try {
+    isSubLLMLoading = true;
+    setLLMLoadingStatus('sub', true, '보조 LLM이 상태를 업데이트 중...');
     const payload = {
       apiKey: appState.apiKey,
+      subPrompt: (subPromptTextarea?.value || '').trim(),
       engineOutput,
-      // 필요하다면, 여기에서도 teamId나 간단한 팀 정보 정도를 함께 넘길 수 있다.
-      selectedTeamId: appState.selectedTeam?.id || null
+      currentState: appState.cachedViews?.schedule || null,
     };
 
-    const res = await fetch('/api/state-update-llm', {
+    const res = await fetch('/api/state-update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -175,7 +196,36 @@ async function callSubLLMStateUpdate(engineOutput) {
     console.log('STATE_UPDATE parsed:', data.parsed);
   } catch (e) {
     console.warn('STATE_UPDATE 호출 중 오류:', e);
+  } finally {
+    isSubLLMLoading = false;
+    setLLMLoadingStatus('sub', false);
   }
+}
+
+// 이벤트 바인딩: 메인 LLM 호출
+if (typeof btnSendToLLM !== 'undefined' && btnSendToLLM) {
+  btnSendToLLM.addEventListener('click', sendToMainLLM);
+}
+
+// 이벤트 바인딩: 빠른 경기 시뮬레이션
+if (typeof btnSimGame !== 'undefined' && btnSimGame) {
+  btnSimGame.addEventListener('click', async () => {
+    if (!appState.selectedTeam) {
+      alert('먼저 팀을 선택한 뒤 진행하세요.');
+      return;
+    }
+
+    btnSimGame.disabled = true;
+    const originalText = btnSimGame.textContent;
+    btnSimGame.textContent = '경기 시뮬레이션 중...';
+
+    try {
+      await simulateGameProgress();
+    } finally {
+      btnSimGame.disabled = false;
+      btnSimGame.textContent = originalText;
+    }
+  });
 }
 
 // 로스터 불러오기

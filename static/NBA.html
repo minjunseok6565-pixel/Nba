@@ -12,7 +12,7 @@
 <div id="app">
 
   <!-- STEP 1: API 키 입력 -->
-  <section id="step-api" class="step active">
+  <section id="screen-api-key" class="step active">
     <div class="center-wrapper">
       <div class="logo-large">
         <span class="logo">느바 시뮬 · <strong>GM</strong></span>
@@ -49,7 +49,7 @@
   </section>
 
   <!-- STEP 2: 팀 선택 -->
-  <section id="step-team" class="step">
+  <section id="screen-team-select" class="step">
     <div class="center-wrapper">
       <div class="logo-large" style="margin-bottom:8px;">
         <span class="logo">느바 시뮬 · <strong>팀 선택</strong></span>
@@ -71,7 +71,7 @@
   </section>
 
   <!-- STEP 3: 메인 GM 화면 (리디자인 적용) -->
-  <section id="step-main" class="step">
+  <section id="screen-main" class="step">
     <div class="main-shell">
 
       <!-- 상단 네비게이션: ESPN 스타일 다크 바 + NBA 배너 -->
@@ -115,6 +115,9 @@
           </div>
           <div class="pill">
             시즌 날짜: <span id="seasonDateLabel">-</span>
+          </div>
+          <div class="pill">
+            진행 턴: <span id="progressLabel">0</span>
           </div>
 
           <button class="prompt-toggle" id="promptToggle" aria-label="프롬프트 설정">
@@ -260,6 +263,7 @@
           <section id="tab-teams" class="tab-screen">
             <div class="teams-wrapper">
               <table id="teamsTable"></table>
+              <div id="teamDetailPanel" class="team-detail-panel"></div>
             </div>
           </section>
 
@@ -284,6 +288,9 @@
   </div>
 </div>
 
-<script src="/static/script.js"></script>
+<script src="/static/state.js"></script>
+<script src="/static/Game_sims.js"></script>
+<script src="/static/ui.js"></script>
+<script src="/static/llm.js"></script>
 </body>
 </html>

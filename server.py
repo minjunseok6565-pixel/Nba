@@ -9,11 +9,24 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config import BASE_DIR, ROSTER_DF, ALL_TEAM_IDS
-from state import GAME_STATE, _ensure_league_state, initialize_master_schedule_if_needed, apply_state_update
+from state import (
+    GAME_STATE,
+    _ensure_league_state,
+    initialize_master_schedule_if_needed,
+    apply_state_update,
+    get_schedule_summary,
+)
 from league_sim import simulate_single_game, advance_league_until
+from news_ai import refresh_weekly_news
+from stats_util import compute_league_leaders
+from team_utils import (
+    get_conference_standings,
+    get_team_cards,
+    get_team_detail,
+)
 
 
 # -------------------------------------------------------------------------
@@ -56,14 +69,20 @@ class SimGameRequest(BaseModel):
 
 class ChatMainRequest(BaseModel):
     apiKey: str
-    mainPrompt: str
-    userInput: str
-    context: str
+    # JS 쪽에서 userMessage라는 필드명을 사용하는 경우도 받아줄 수 있게 alias 지정
+    userInput: str = Field(..., alias="userMessage")
+    mainPrompt: Optional[str] = ""
+    context: Any = ""
+
+    class Config:
+        allow_population_by_field_name = True
+        allow_population_by_alias = True
+        fields = {"userInput": "userMessage"}
 
 
 class StateUpdateRequest(BaseModel):
     apiKey: str
-    subPrompt: str
+    subPrompt: Optional[str] = ""
     engineOutput: Dict[str, Any]
     currentState: Optional[Dict[str, Any]] = None
 
@@ -71,6 +90,14 @@ class StateUpdateRequest(BaseModel):
 class AdvanceLeagueRequest(BaseModel):
     target_date: str  # YYYY-MM-DD, 이 날짜까지 리그를 자동 진행
     user_team_id: Optional[str] = None
+
+
+class WeeklyNewsRequest(BaseModel):
+    apiKey: str
+
+
+class ApiKeyRequest(BaseModel):
+    apiKey: str
 
 
 # -------------------------------------------------------------------------
@@ -139,6 +166,65 @@ async def api_advance_league(req: AdvanceLeagueRequest):
 
 
 # -------------------------------------------------------------------------
+# 리그 리더 / 스탠딩 / 팀 API
+# -------------------------------------------------------------------------
+
+
+@app.get("/api/stats/leaders")
+async def api_stats_leaders():
+    return compute_league_leaders()
+
+
+@app.get("/api/standings")
+async def api_standings():
+    return get_conference_standings()
+
+
+@app.get("/api/teams")
+async def api_teams():
+    return get_team_cards()
+
+
+@app.get("/api/team-detail/{team_id}")
+async def api_team_detail(team_id: str):
+    try:
+        return get_team_detail(team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# 주간 뉴스 (LLM 요약)
+# -------------------------------------------------------------------------
+
+
+@app.post("/api/news/week")
+async def api_news_week(req: WeeklyNewsRequest):
+    if not req.apiKey:
+        raise HTTPException(status_code=400, detail="apiKey is required")
+    try:
+        return refresh_weekly_news(req.apiKey)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weekly news generation failed: {e}")
+
+
+@app.post("/api/validate-key")
+async def api_validate_key(req: ApiKeyRequest):
+    """주어진 Gemini API 키를 간단히 검증한다."""
+    if not req.apiKey:
+        raise HTTPException(status_code=400, detail="apiKey is required")
+
+    try:
+        genai.configure(api_key=req.apiKey)
+        # 최소 호출로 키 유효성 확인 (토큰 카운트 호출)
+        model = genai.GenerativeModel("gemini-3-pro-preview")
+        model.count_tokens("ping")
+        return {"valid": True}
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid API key: {e}")
+
+
+# -------------------------------------------------------------------------
 # 메인 LLM (Home 대화) API
 # -------------------------------------------------------------------------
 @app.post("/api/chat-main")
@@ -154,12 +240,22 @@ async def chat_main(req: ChatMainRequest):
             system_instruction=req.mainPrompt or "",
         )
 
-        prompt = f"{req.context}\n\n[USER]\n{req.userInput}"
+        context_text = req.context
+        if isinstance(req.context, (dict, list)):
+            context_text = json.dumps(req.context, ensure_ascii=False)
+
+        prompt = f"{context_text}\n\n[USER]\n{req.userInput}"
         resp = model.generate_content(prompt)
         text = extract_text_from_gemini_response(resp)
-        return {"reply": text}
+        return {"reply": text, "answer": text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini main chat error: {e}")
+
+
+@app.post("/api/main-llm")
+async def chat_main_legacy(req: ChatMainRequest):
+    """프론트 JS가 /api/main-llm, userMessage 필드로 호출하던 버전을 위한 호환 엔드포인트."""
+    return await chat_main(req)
 
 
 # -------------------------------------------------------------------------
@@ -209,6 +305,12 @@ async def state_update(req: StateUpdateRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini sub/state-update error: {e}")
+
+
+@app.post("/api/state-update-llm")
+async def state_update_legacy(req: StateUpdateRequest):
+    """프론트 JS가 /api/state-update-llm 으로 호출하던 버전을 위한 호환 엔드포인트."""
+    return await state_update(req)
 
 
 # -------------------------------------------------------------------------
@@ -295,3 +397,9 @@ async def team_schedule(team_id: str):
 async def state_summary():
     """현재 GAME_STATE를 그대로 반환."""
     return GAME_STATE
+
+
+@app.get("/api/debug/schedule-summary")
+async def debug_schedule_summary():
+    """마스터 스케줄 생성/검증용 디버그 엔드포인트."""
+    return get_schedule_summary()

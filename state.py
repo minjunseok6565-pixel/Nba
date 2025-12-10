@@ -12,6 +12,7 @@ from config import (
     SEASON_START_DAY,
     SEASON_LENGTH_DAYS,
     MAX_GAMES_PER_DAY,
+    DIVISIONS,
 )
 
 # -------------------------------------------------------------------------
@@ -21,6 +22,7 @@ GAME_STATE: Dict[str, Any] = {
     "schema_version": "1.1",
     "turn": 0,
     "games": [],  # 각 경기의 메타 데이터
+    "player_stats": {},  # player_id -> 시즌 누적 스탯
     "cached_views": {
         "scores": {
             "latest_date": None,
@@ -31,6 +33,13 @@ GAME_STATE: Dict[str, Any] = {
         },
         "news": {
             "items": []  # 간단 뉴스 피드
+        },
+        "stats": {
+            "leaders": None,
+        },
+        "weekly_news": {
+            "last_generated_week_start": None,
+            "items": [],
         },
     },
     "league": {
@@ -86,22 +95,23 @@ def _ensure_league_state() -> Dict[str, Any]:
 def _build_master_schedule(season_year: int) -> None:
     """30개 팀 전체에 대한 마스터 스케줄(정규시즌)을 생성한다.
 
-    - DIVISIONS / 컨퍼런스 정보를 사용해
-      * 같은 디비전: 4경기
-      * 같은 컨퍼런스 다른 디비전: 3~4경기 (랜덤, 평균적으로 NBA 규칙 근사)
-      * 다른 컨퍼런스: 2경기
-    - 각 경기마다 홈/원정을 나누고
+    - 실제 NBA 규칙을 근사하여 **항상 1230경기, 팀당 82경기**가 되도록
+      경기 수를 결정한다.
+    - 같은 디비전: 4경기
+    - 같은 컨퍼런스 다른 디비전: 한 팀당 6개 팀과는 4경기, 4개 팀과는 3경기
+      (규칙적인 회전 매핑으로 결정)
+    - 다른 컨퍼런스: 2경기
+    - 홈/원정은 누적 홈 경기 수를 고려해 최대한 41/41에 가깝게 분배한다.
     - 시즌 기간(SEASON_LENGTH_DAYS) 동안 날짜를 랜덤 배정하되
       * 하루 최대 MAX_GAMES_PER_DAY 경기
       * 한 팀은 하루에 최대 1경기
     """
     league = _ensure_league_state()
 
-    # 시즌 시작일 (프론트 JS와 동일하게 10월 19일 기준)
     season_start = date(season_year, SEASON_START_MONTH, SEASON_START_DAY)
     teams = list(ALL_TEAM_IDS)
 
-    # 팀별 컨퍼런스/디비전 정보
+    # 팀별 컨퍼런스/디비전 정보 캐시
     team_info: Dict[str, Dict[str, Optional[str]]] = {}
     for tid in teams:
         info = TEAM_TO_CONF_DIV.get(tid, {"conference": None, "division": None})
@@ -110,8 +120,34 @@ def _build_master_schedule(season_year: int) -> None:
             "division": info.get("division"),
         }
 
+    # 컨퍼런스 내 다른 디비전 4경기 매칭을 결정하는 헬퍼 (5x5 회전 매핑)
+    def _four_game_pairs_for_conf(conf_name: str) -> set[tuple[str, str]]:
+        pairs: set[tuple[str, str]] = set()
+        conf_divs = DIVISIONS.get(conf_name, {})
+        div_list = list(conf_divs.values())
+        if len(div_list) < 2:
+            return pairs
+
+        for i in range(len(div_list)):
+            for j in range(i + 1, len(div_list)):
+                a_div = div_list[i]
+                b_div = div_list[j]
+                if not a_div or not b_div:
+                    continue
+                for idx, a_team in enumerate(a_div):
+                    for delta in range(3):  # 각 팀이 상대 디비전 팀 3명에게 4경기 배정
+                        b_team = b_div[(idx + delta) % len(b_div)]
+                        pair = tuple(sorted((a_team, b_team)))
+                        pairs.add(pair)
+        return pairs
+
+    four_game_pairs_east = _four_game_pairs_for_conf("East")
+    four_game_pairs_west = _four_game_pairs_for_conf("West")
+    four_game_pairs = four_game_pairs_east | four_game_pairs_west
+
     # 1) 팀 쌍별로 경기 수 결정 + 홈/원정 분배
     pair_games: List[Dict[str, Any]] = []
+    home_counts: Dict[str, int] = {tid: 0 for tid in teams}
 
     for i in range(len(teams)):
         for j in range(i + 1, len(teams)):
@@ -124,31 +160,24 @@ def _build_master_schedule(season_year: int) -> None:
             conf2, div2 = info2["conference"], info2["division"]
 
             if conf1 is None or conf2 is None:
-                # 디비전 정보가 없으면 안전하게 2경기(홈/원정)만 배정
                 num_games = 2
-            elif conf1 == conf2:
-                if div1 == div2:
-                    # 같은 디비전: 4경기
-                    num_games = 4
-                else:
-                    # 같은 컨퍼런스 다른 디비전: 3 또는 4경기 (확률적으로 4가 더 많게)
-                    num_games = 4 if random.random() < 0.6 else 3
+            elif conf1 != conf2:
+                num_games = 2  # 다른 컨퍼런스는 2경기 고정
+            elif div1 == div2:
+                num_games = 4  # 같은 디비전
             else:
-                # 다른 컨퍼런스: 2경기 (홈/원정)
-                num_games = 2
+                # 같은 컨퍼런스 다른 디비전
+                pair_key = tuple(sorted((t1, t2)))
+                num_games = 4 if pair_key in four_game_pairs else 3
 
-            # 홈/원정 분배
-            if num_games % 2 == 0:
-                home_for_t1 = num_games // 2
-                home_for_t2 = num_games // 2
-            else:
-                # 3경기인 경우 한 팀은 2홈 1원, 다른 팀은 1홈 2원
-                if random.random() < 0.5:
-                    home_for_t1 = num_games // 2 + 1
-                    home_for_t2 = num_games // 2
+            # 홈/원정 분배 (3경기일 때는 현재 홈 수가 적은 팀에 추가 배정)
+            home_for_t1 = num_games // 2
+            home_for_t2 = num_games // 2
+            if num_games % 2 == 1:
+                if home_counts[t1] <= home_counts[t2]:
+                    home_for_t1 += 1
                 else:
-                    home_for_t1 = num_games // 2
-                    home_for_t2 = num_games // 2 + 1
+                    home_for_t2 += 1
 
             for _ in range(home_for_t1):
                 pair_games.append({
@@ -160,6 +189,9 @@ def _build_master_schedule(season_year: int) -> None:
                     "home_team_id": t2,
                     "away_team_id": t1,
                 })
+
+            home_counts[t1] += home_for_t1
+            home_counts[t2] += home_for_t2
 
     # 2) 날짜 배정
     random.shuffle(pair_games)
@@ -186,7 +218,6 @@ def _build_master_schedule(season_year: int) -> None:
             if home_id in teams_today or away_id in teams_today:
                 continue
 
-            # 이 날짜에 배정
             teams_today.add(home_id)
             teams_today.add(away_id)
 
@@ -205,7 +236,6 @@ def _build_master_schedule(season_year: int) -> None:
             break
 
         if not assigned:
-            # 제약을 맞추기 어려운 경우, 제약을 완화해서 넣는다.
             day_index = random.randint(0, SEASON_LENGTH_DAYS - 1)
             game_date = season_start + timedelta(days=day_index)
             date_str = game_date.isoformat()
@@ -236,10 +266,8 @@ def _build_master_schedule(season_year: int) -> None:
     master_schedule["by_team"] = by_team
     master_schedule["by_date"] = by_date
 
-    # 시즌/트레이드 데드라인 정보 설정
     league["season_year"] = season_year
     league["season_start"] = season_start.isoformat()
-    # 트레이드 데드라인: 이듬해 2월 5일
     trade_deadline_date = date(season_year + 1, 2, 5)
     league["trade_rules"]["trade_deadline"] = trade_deadline_date.isoformat()
     league["current_date"] = None
@@ -289,11 +317,13 @@ def update_state_with_game(
     home_id: str,
     away_id: str,
     score: Dict[str, int],
+    boxscore: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     game_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     """매치엔진 결과를 GAME_STATE와 cached_views에 반영.
 
     - game_date 가 주어지면 그 값을 사용, 없으면 서버 기준 오늘 날짜 사용.
+    - boxscore 가 주어지면 시즌 누적 player_stats 에 반영한다.
     """
     game_date_str = str(game_date) if game_date else date.today().isoformat()
     game_id = f"{game_date_str}_{home_id}_{away_id}"
@@ -317,6 +347,9 @@ def update_state_with_game(
 
     # games 리스트에 추가
     GAME_STATE["games"].append(game_obj)
+
+    if boxscore:
+        _update_player_stats_from_boxscore(boxscore)
 
     # scores 캐시 업데이트 (가장 최근 일자 기준)
     scores_view = GAME_STATE["cached_views"]["scores"]
@@ -367,6 +400,48 @@ def update_state_with_game(
     return game_obj
 
 
+def _update_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]) -> None:
+    """박스스코어를 시즌 누적 player_stats에 반영한다."""
+    if not boxscore:
+        return
+
+    season_stats = GAME_STATE.setdefault("player_stats", {})
+    track_stats = ["PTS", "AST", "REB", "3PM"]
+
+    for team_rows in boxscore.values():
+        if not isinstance(team_rows, list):
+            continue
+        for row in team_rows:
+            if not isinstance(row, dict):
+                continue
+            player_id = row.get("PlayerID")
+            if player_id is None:
+                continue
+            stat_entry = season_stats.setdefault(
+                player_id,
+                {
+                    "player_id": player_id,
+                    "name": row.get("Name"),
+                    "team_id": row.get("Team"),
+                    "games": 0,
+                    "totals": {s: 0.0 for s in track_stats},
+                },
+            )
+
+            stat_entry["name"] = row.get("Name", stat_entry.get("name"))
+            stat_entry["team_id"] = row.get("Team", stat_entry.get("team_id"))
+            stat_entry["games"] = stat_entry.get("games", 0) + 1
+
+            totals = stat_entry.setdefault("totals", {s: 0.0 for s in track_stats})
+            for stat_name in track_stats:
+                try:
+                    totals[stat_name] = float(totals.get(stat_name, 0.0)) + float(
+                        row.get(stat_name, 0) or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
+
+
 def apply_state_update(update: Dict[str, Any]) -> None:
     """보조 LLM이 만든 STATE_UPDATE JSON을 GAME_STATE에 병합."""
     if not isinstance(update, dict):
@@ -381,3 +456,49 @@ def apply_state_update(update: Dict[str, Any]) -> None:
 
     if "cached_views" in update and update["cached_views"] is not None:
         GAME_STATE["cached_views"] = update["cached_views"]
+
+
+def get_schedule_summary() -> Dict[str, Any]:
+    """마스터 스케줄 통계 요약을 반환한다.
+
+    - 총 경기 수, 상태별 경기 수
+    - 팀별 총 경기 수(82 보장 여부)와 홈/원정 분배
+    """
+    initialize_master_schedule_if_needed()
+    league = _ensure_league_state()
+    master = league.get("master_schedule") or {}
+    games = master.get("games") or []
+    by_team = master.get("by_team") or {}
+
+    status_counts: Dict[str, int] = {}
+    home_away: Dict[str, Dict[str, int]] = {
+        tid: {"home": 0, "away": 0} for tid in ALL_TEAM_IDS
+    }
+
+    for g in games:
+        status = g.get("status", "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+        home_id = g.get("home_team_id")
+        away_id = g.get("away_team_id")
+        if home_id in home_away:
+            home_away[home_id]["home"] += 1
+        if away_id in home_away:
+            home_away[away_id]["away"] += 1
+
+    team_breakdown: Dict[str, Dict[str, Any]] = {}
+    for tid in ALL_TEAM_IDS:
+        team_breakdown[tid] = {
+            "games": len(by_team.get(tid, [])),
+            "home": home_away.get(tid, {}).get("home", 0),
+            "away": home_away.get(tid, {}).get("away", 0),
+        }
+        team_breakdown[tid]["home_away_diff"] = (
+            team_breakdown[tid]["home"] - team_breakdown[tid]["away"]
+        )
+
+    return {
+        "total_games": len(games),
+        "status_counts": status_counts,
+        "team_breakdown": team_breakdown,
+    }
