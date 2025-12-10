@@ -65,13 +65,29 @@ const lorebookStatus = document.getElementById('lorebookStatus');
 const tacticsPaceInput = document.getElementById('tactics-pace');
 const tacticsPaceLabel = document.getElementById('tactics-pace-label');
 const tacticsOffenseSelect = document.getElementById('tactics-offense-scheme');
+const tacticsOffenseSecondarySelect = document.getElementById('tactics-offense-scheme-secondary');
+const tacticsOffenseShareInput = document.getElementById('tactics-offense-share');
+const tacticsOffenseShareLabel = document.getElementById('tactics-offense-share-label');
 const tacticsDefenseSelect = document.getElementById('tactics-defense-scheme');
+const tacticsDefenseSecondarySelect = document.getElementById('tactics-defense-scheme-secondary');
+const tacticsDefenseShareInput = document.getElementById('tactics-defense-share');
+const tacticsDefenseShareLabel = document.getElementById('tactics-defense-share-label');
 const tacticsRotationSelect = document.getElementById('tactics-rotation-size');
 const tacticsTeamLabel = document.getElementById('tactics-team-label');
 const tacticsStartersContainer = document.getElementById('tactics-starters');
 const tacticsBenchContainer = document.getElementById('tactics-bench');
 const tacticsRosterList = document.getElementById('tactics-roster-list');
 const tacticsLineupSummary = document.getElementById('tactics-lineup-summary');
+const tacticsMinutesList = document.getElementById('tactics-minutes-list');
+const tacticsMinutesSummary = document.getElementById('tactics-minutes-summary');
+
+const ROTATION_MINUTE_DEFAULTS = {
+  6: { starter: 41, bench: 35 },
+  7: { starter: 36, bench: 30 },
+  8: { starter: 33, bench: 25 },
+  9: { starter: 28, bench: 25 },
+  10: { starter: 25, bench: 23 }
+};
 
 function showScreen(name) {
   screenApiKey.style.display = name === 'apiKey' ? 'block' : 'none';
@@ -300,8 +316,20 @@ async function renderTacticsTab() {
   if (tacticsOffenseSelect) {
     tacticsOffenseSelect.value = tactics.offenseScheme || 'pace_space';
   }
+  if (tacticsOffenseSecondarySelect) {
+    tacticsOffenseSecondarySelect.value = tactics.offenseSecondaryScheme || 'pace_space';
+  }
+  if (tacticsOffenseShareInput) {
+    updateOffenseShareLabel(tactics);
+  }
   if (tacticsDefenseSelect) {
     tacticsDefenseSelect.value = tactics.defenseScheme || 'drop_coverage';
+  }
+  if (tacticsDefenseSecondarySelect) {
+    tacticsDefenseSecondarySelect.value = tactics.defenseSecondaryScheme || 'drop_coverage';
+  }
+  if (tacticsDefenseShareInput) {
+    updateDefenseShareLabel(tactics);
   }
   if (tacticsRotationSelect) {
     tacticsRotationSelect.value = String(tactics.rotationSize || 9);
@@ -326,11 +354,127 @@ function updateTacticsPaceLabel() {
   tacticsPaceLabel.textContent = `${v} (${text})`;
 }
 
+function getDefaultMinutesForRole(role, rotationSize) {
+  const defaults = ROTATION_MINUTE_DEFAULTS[rotationSize] || { starter: 32, bench: 22 };
+  return role === 'starter' ? defaults.starter : defaults.bench;
+}
+
+function updateOffenseShareLabel(tactics) {
+  if (!tacticsOffenseShareInput || !tacticsOffenseShareLabel) return;
+  const secondary = Number(tactics.offenseSecondaryWeight ?? 5);
+  const primary = Math.max(secondary, 10 - secondary);
+  tactics.offensePrimaryWeight = primary;
+  tactics.offenseSecondaryWeight = secondary;
+  tacticsOffenseShareInput.value = String(secondary);
+  tacticsOffenseShareLabel.textContent = `메인 ${primary} : 보조 ${secondary}`;
+}
+
+function updateDefenseShareLabel(tactics) {
+  if (!tacticsDefenseShareInput || !tacticsDefenseShareLabel) return;
+  const secondary = Number(tactics.defenseSecondaryWeight ?? 5);
+  const primary = Math.max(secondary, 10 - secondary);
+  tactics.defensePrimaryWeight = primary;
+  tactics.defenseSecondaryWeight = secondary;
+  tacticsDefenseShareInput.value = String(secondary);
+  tacticsDefenseShareLabel.textContent = `메인 ${primary} : 보조 ${secondary}`;
+}
+
+function ensureMinutesForLineup(startersList, benchList, tactics) {
+  if (!tactics.minutes) tactics.minutes = {};
+  const rotationSize = tactics.rotationSize || 9;
+  const rotationIds = new Set([...startersList, ...benchList].map(p => p.player_id));
+
+  startersList.forEach(p => {
+    if (tactics.minutes[p.player_id] == null) {
+      tactics.minutes[p.player_id] = getDefaultMinutesForRole('starter', rotationSize);
+    }
+  });
+
+  benchList.forEach(p => {
+    if (tactics.minutes[p.player_id] == null) {
+      tactics.minutes[p.player_id] = getDefaultMinutesForRole('bench', rotationSize);
+    }
+  });
+
+  Object.keys(tactics.minutes).forEach(pid => {
+    if (!rotationIds.has(Number(pid))) {
+      delete tactics.minutes[pid];
+    }
+  });
+}
+
+function renderMinutesEditor(startersList, benchList, tactics) {
+  if (!tacticsMinutesList || !tacticsMinutesSummary) return;
+  const rotationSize = tactics.rotationSize || 9;
+  ensureMinutesForLineup(startersList, benchList, tactics);
+
+  const minutes = tactics.minutes || {};
+  const rows = [
+    ...startersList.map(p => ({ player: p, role: '스타팅' })),
+    ...benchList.map(p => ({ player: p, role: '벤치' }))
+  ];
+
+  tacticsMinutesList.innerHTML = '';
+  let totalMinutes = 0;
+
+  rows.forEach(({ player, role }) => {
+    const row = document.createElement('div');
+    row.className = 'tactics-minute-row';
+
+    const name = document.createElement('div');
+    name.className = 'player-name';
+    name.textContent = `${player.name} (${player.pos})`;
+
+    const roleLabel = document.createElement('div');
+    roleLabel.className = 'player-role';
+    roleLabel.textContent = role;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.max = '48';
+    input.step = '0.5';
+    input.className = 'tactics-minute-input';
+    input.value = minutes[player.player_id] ?? getDefaultMinutesForRole(role === '스타팅' ? 'starter' : 'bench', rotationSize);
+
+    input.addEventListener('input', () => {
+      const val = Math.max(0, Math.min(48, Number(input.value)));
+      tactics.minutes[player.player_id] = val;
+      input.value = String(val);
+      renderMinutesEditor(startersList, benchList, tactics);
+    });
+
+    totalMinutes += Number(input.value) || 0;
+
+    row.appendChild(name);
+    row.appendChild(roleLabel);
+    row.appendChild(input);
+    tacticsMinutesList.appendChild(row);
+  });
+
+  tacticsMinutesSummary.textContent = `총 ${totalMinutes.toFixed(1)}분 (목표 240분, 비율 기준으로 환산)`;
+}
+
 function renderTacticsLineup(players, tactics) {
   if (!tacticsStartersContainer || !tacticsBenchContainer || !tacticsRosterList) return;
 
-  const starters = new Set(tactics.starters || []);
-  const bench = new Set(tactics.bench || []);
+  const rotationSize = tactics.rotationSize || 9;
+  const starterSet = new Set(tactics.starters || []);
+  const benchSet = new Set(tactics.bench || []);
+
+  let startersList = players.filter(p => starterSet.has(p.player_id)).slice(0, 5);
+  let benchList = players.filter(p => benchSet.has(p.player_id));
+
+  const maxBench = Math.max(0, rotationSize - startersList.length);
+  if (benchList.length > maxBench) {
+    benchList = benchList.slice(0, maxBench);
+  }
+
+  const normalizedStarters = new Set(startersList.map(p => p.player_id));
+  const normalizedBench = new Set(benchList.map(p => p.player_id));
+
+  tactics.starters = Array.from(normalizedStarters);
+  tactics.bench = Array.from(normalizedBench);
 
   tacticsStartersContainer.innerHTML = '';
   tacticsBenchContainer.innerHTML = '';
@@ -342,13 +486,8 @@ function renderTacticsLineup(players, tactics) {
     return div;
   };
 
-  players.forEach(p => {
-    if (starters.has(p.player_id)) {
-      tacticsStartersContainer.appendChild(makeTag(p));
-    } else if (bench.has(p.player_id)) {
-      tacticsBenchContainer.appendChild(makeTag(p));
-    }
-  });
+  startersList.forEach(p => tacticsStartersContainer.appendChild(makeTag(p)));
+  benchList.forEach(p => tacticsBenchContainer.appendChild(makeTag(p)));
 
   tacticsRosterList.innerHTML = '';
   players.forEach(p => {
@@ -373,51 +512,47 @@ function renderTacticsLineup(players, tactics) {
     btnBench.className = 'tactics-role-button';
 
     const refreshButtonClasses = () => {
-      btnStarter.classList.toggle('selected', starters.has(p.player_id));
-      btnBench.classList.toggle('selected', bench.has(p.player_id));
+      btnStarter.classList.toggle('selected', normalizedStarters.has(p.player_id));
+      btnBench.classList.toggle('selected', normalizedBench.has(p.player_id));
     };
     refreshButtonClasses();
 
     btnStarter.addEventListener('click', () => {
-      const rotationSize = tactics.rotationSize || 9;
-
-      if (starters.has(p.player_id)) {
-        starters.delete(p.player_id);
+      if (normalizedStarters.has(p.player_id)) {
+        normalizedStarters.delete(p.player_id);
       } else {
-        if (starters.size >= 5) {
+        if (normalizedStarters.size >= 5) {
           alert('스타팅은 최대 5명까지 설정할 수 있습니다.');
           return;
         }
-        starters.add(p.player_id);
-        bench.delete(p.player_id);
+        normalizedStarters.add(p.player_id);
+        normalizedBench.delete(p.player_id);
       }
 
-      if (starters.size + bench.size > rotationSize) {
+      if (normalizedStarters.size + normalizedBench.size > rotationSize) {
         alert(`로테이션 인원(${rotationSize}명)을 초과했습니다.`);
-        starters.delete(p.player_id);
+        normalizedStarters.delete(p.player_id);
       } else {
-        tactics.starters = Array.from(starters);
-        tactics.bench = Array.from(bench);
+        tactics.starters = Array.from(normalizedStarters);
+        tactics.bench = Array.from(normalizedBench);
         renderTacticsLineup(players, tactics);
       }
     });
 
     btnBench.addEventListener('click', () => {
-      const rotationSize = tactics.rotationSize || 9;
-
-      if (bench.has(p.player_id)) {
-        bench.delete(p.player_id);
+      if (normalizedBench.has(p.player_id)) {
+        normalizedBench.delete(p.player_id);
       } else {
-        if (starters.size + bench.size >= rotationSize) {
+        if (normalizedStarters.size + normalizedBench.size >= rotationSize) {
           alert(`로테이션 인원(${rotationSize}명)을 초과했습니다.`);
           return;
         }
-        bench.add(p.player_id);
-        starters.delete(p.player_id);
+        normalizedBench.add(p.player_id);
+        normalizedStarters.delete(p.player_id);
       }
 
-      tactics.starters = Array.from(starters);
-      tactics.bench = Array.from(bench);
+      tactics.starters = Array.from(normalizedStarters);
+      tactics.bench = Array.from(normalizedBench);
       renderTacticsLineup(players, tactics);
     });
 
@@ -430,10 +565,12 @@ function renderTacticsLineup(players, tactics) {
   });
 
   if (tacticsLineupSummary) {
-    const total = starters.size + bench.size;
+    const total = normalizedStarters.size + normalizedBench.size;
     tacticsLineupSummary.textContent =
-      `현재 로테이션: 스타팅 ${starters.size}명 + 벤치 ${bench.size}명 = 총 ${total}명 (설정값: ${tactics.rotationSize}명)`;
+      `현재 로테이션: 스타팅 ${normalizedStarters.size}명 + 벤치 ${normalizedBench.size}명 = 총 ${total}명 (설정값: ${rotationSize}명)`;
   }
+
+  renderMinutesEditor(startersList, benchList, tactics);
 }
 
 // 프롬프트 팝오버 토글
@@ -509,12 +646,60 @@ if (tacticsOffenseSelect) {
   });
 }
 
+if (tacticsOffenseSecondarySelect) {
+  tacticsOffenseSecondarySelect.addEventListener('change', () => {
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    tactics.offenseSecondaryScheme = tacticsOffenseSecondarySelect.value;
+    if (tactics.offenseSecondaryScheme === 'none') {
+      tactics.offenseSecondaryWeight = 0;
+    }
+    updateOffenseShareLabel(tactics);
+  });
+}
+
+if (tacticsOffenseShareInput) {
+  tacticsOffenseShareInput.addEventListener('input', () => {
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    const val = Math.max(0, Math.min(5, Number(tacticsOffenseShareInput.value)));
+    tactics.offenseSecondaryWeight = val;
+    updateOffenseShareLabel(tactics);
+  });
+}
+
 if (tacticsDefenseSelect) {
   tacticsDefenseSelect.addEventListener('change', () => {
     const team = appState.selectedTeam;
     if (!team) return;
     const tactics = getOrCreateTacticsForTeam(team.id);
     tactics.defenseScheme = tacticsDefenseSelect.value;
+  });
+}
+
+if (tacticsDefenseSecondarySelect) {
+  tacticsDefenseSecondarySelect.addEventListener('change', () => {
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    tactics.defenseSecondaryScheme = tacticsDefenseSecondarySelect.value;
+    if (tactics.defenseSecondaryScheme === 'none') {
+      tactics.defenseSecondaryWeight = 0;
+    }
+    updateDefenseShareLabel(tactics);
+  });
+}
+
+if (tacticsDefenseShareInput) {
+  tacticsDefenseShareInput.addEventListener('input', () => {
+    const team = appState.selectedTeam;
+    if (!team) return;
+    const tactics = getOrCreateTacticsForTeam(team.id);
+    const val = Math.max(0, Math.min(5, Number(tacticsDefenseShareInput.value)));
+    tactics.defenseSecondaryWeight = val;
+    updateDefenseShareLabel(tactics);
   });
 }
 

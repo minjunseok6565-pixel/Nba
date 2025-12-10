@@ -252,6 +252,31 @@
                 </div>
 
                 <div class="tactics-row">
+                  <label for="tactics-offense-scheme-secondary">보조 공격 스킴</label>
+                  <select id="tactics-offense-scheme-secondary">
+                    <option value="none">보조 스킴 없음</option>
+                    <option value="pace_space">Pace &amp; Space</option>
+                    <option value="five_out_motion">5-Out Motion</option>
+                    <option value="pnr_heavy">PnR Heavy</option>
+                    <option value="post_up_focus">Post-Up Focus</option>
+                    <option value="iso_heavy">Isolation Heavy</option>
+                    <option value="drive_kick">Drive &amp; Kick</option>
+                  </select>
+                </div>
+
+                <div class="tactics-row">
+                  <label for="tactics-offense-share">공격 스킴 배분</label>
+                  <input
+                    type="range"
+                    id="tactics-offense-share"
+                    min="0"
+                    max="5"
+                    step="1"
+                  />
+                  <span id="tactics-offense-share-label" class="tactics-pace-label"></span>
+                </div>
+
+                <div class="tactics-row">
                   <label for="tactics-defense-scheme">수비 스킴</label>
                   <select id="tactics-defense-scheme">
                     <option value="drop_coverage">Drop Coverage</option>
@@ -261,6 +286,31 @@
                     <option value="zone_2_3">2-3 Zone</option>
                     <option value="full_court_press">Full-Court Press</option>
                   </select>
+                </div>
+
+                <div class="tactics-row">
+                  <label for="tactics-defense-scheme-secondary">보조 수비 스킴</label>
+                  <select id="tactics-defense-scheme-secondary">
+                    <option value="none">보조 스킴 없음</option>
+                    <option value="drop_coverage">Drop Coverage</option>
+                    <option value="switch_all">Switch Everything</option>
+                    <option value="hedge_recover">Hedge &amp; Recover</option>
+                    <option value="blitz_pnr">Blitz PnR</option>
+                    <option value="zone_2_3">2-3 Zone</option>
+                    <option value="full_court_press">Full-Court Press</option>
+                  </select>
+                </div>
+
+                <div class="tactics-row">
+                  <label for="tactics-defense-share">수비 스킴 배분</label>
+                  <input
+                    type="range"
+                    id="tactics-defense-share"
+                    min="0"
+                    max="5"
+                    step="1"
+                  />
+                  <span id="tactics-defense-share-label" class="tactics-pace-label"></span>
                 </div>
 
                 <div class="tactics-row">
@@ -298,6 +348,12 @@
                 </div>
 
                 <div id="tactics-lineup-summary" class="tactics-lineup-summary muted"></div>
+
+                <div id="tactics-minutes-panel" class="tactics-minutes-panel">
+                  <h4>출전 시간 배분</h4>
+                  <div id="tactics-minutes-list" class="tactics-minutes-list"></div>
+                  <div id="tactics-minutes-summary" class="tactics-lineup-summary muted"></div>
+                </div>
               </div>
             </div>
           </section>
