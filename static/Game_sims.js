@@ -286,7 +286,7 @@ async function simulateGameProgress() {
 
     // Scores 탭 캐시 (유저 팀 경기)
     appState.cachedViews.scores.latest_date = gameDate;
-    appState.cachedViews.scores.games.unshift({
+    const userGameEntry = {
       game_id: nextGame.game_id,
       date: gameDate,
       home_team_id: homeTeam.id,
@@ -298,7 +298,9 @@ async function simulateGameProgress() {
       status: "final",
       is_overtime: false,
       top_performers: []
-    });
+    };
+
+    appState.cachedViews.scores.games.unshift(userGameEntry);
 
     // 스케줄 항목에 결과 반영
     nextGame.home_score = homeScore;
@@ -360,7 +362,19 @@ async function simulateGameProgress() {
       callSubLLMStateUpdate(data);
     }
 
-    return true;
+    return {
+      success: true,
+      game_id: nextGame.game_id,
+      game_date: gameDate,
+      home_team_id: homeTeam.id,
+      away_team_id: awayTeam.id,
+      home_team_name: homeTeam.name,
+      away_team_name: awayTeam.name,
+      home_score: homeScore,
+      away_score: awayScore,
+      result_for_user_team: nextGame.result_for_user_team,
+      log_entry: userGameEntry
+    };
   } catch (err) {
     console.error(err);
     alert("매치 엔진 호출 중 오류가 발생했습니다. (콘솔 로그 확인)");
