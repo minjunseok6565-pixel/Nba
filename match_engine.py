@@ -48,6 +48,7 @@ class Player:
         "3PA": 0.0,
         "FTM": 0.0,
         "FTA": 0.0,
+        "PF": 0.0,
     })
 
     # usage(공격 비중) 기본 가중치
@@ -55,6 +56,10 @@ class Player:
 
     def inc(self, key: str, val: float = 1.0) -> None:
         self.stats[key] = self.stats.get(key, 0.0) + val
+
+    def reset_stats(self) -> None:
+        for k in list(self.stats.keys()):
+            self.stats[k] = 0.0
 
 
 @dataclass
@@ -252,16 +257,21 @@ class MatchEngine:
         self.rng = random.Random(seed)
 
     def simulate_game(self) -> Dict[str, Any]:
+        """Reset all player stats and simulate one full, independent game."""
+        for team in (self.home, self.away):
+            for p in team.players:
+                p.reset_stats()
+
         poss = self._estimate_possessions()
 
         offense = self.home
         defense = self.away
 
         game_minutes = 48.0
-        minutes_per_possession = game_minutes / poss
+        minutes_per_possession = game_minutes * 5.0 / poss
 
         for i in range(poss):
-            self._simulate_possession(offense, defense)
+            next_offense = self._simulate_possession(offense, defense)
 
             # 간단한 분배: 로테이션 인원 비율대로 분배
             for team in (offense, defense):
@@ -270,7 +280,8 @@ class MatchEngine:
                     share = p.usage_weight / total_usage if total_usage > 0 else 1.0 / len(team.rotation_players)
                     p.inc("MIN", minutes_per_possession * share)
 
-            offense, defense = defense, offense
+            offense = next_offense
+            defense = self.away if next_offense is self.home else self.home
 
         home_score = sum(p.stats["PTS"] for p in self.home.rotation_players)
         away_score = sum(p.stats["PTS"] for p in self.away.rotation_players)
@@ -315,13 +326,13 @@ class MatchEngine:
     # -----------------------------
     # 포제션 1개 시뮬
     # -----------------------------
-    def _simulate_possession(self, offense: Team, defense: Team) -> None:
+    def _simulate_possession(self, offense: Team, defense: Team) -> Team:
         off_scheme = offense.tactics.get("offense_scheme", "pace_space")
         def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
 
         # 1) 초기 턴오버 (프레스, 트랩, 핸들링)
         if self._maybe_early_turnover(offense, defense):
-            return
+            return defense
 
         # 2) 플레이 타입 선택 (iso / pnr / post / drive_kick / motion / generic)
         play_type = self._pick_play_type(offense, defense)
@@ -344,14 +355,20 @@ class MatchEngine:
             pts = 3 if is_three else 2
             shooter.inc("PTS", pts)
             shooter.inc("FGM", 1)
+            if is_three:
+                shooter.inc("3PM", 1)
         shooter.inc("FGA", 1)
         if is_three:
             shooter.inc("3PA", 1)
 
         if made:
             self._maybe_assist(offense, defense, shooter, play_type)
-        else:
-            self._resolve_rebound(offense, defense)
+            return defense
+        if foul_drawn:
+            return defense
+
+        reb_team = self._resolve_rebound(offense, defense)
+        return reb_team
 
     # -----------------------------
     # 초기 턴오버 (프레스/트랩 등)
@@ -381,9 +398,31 @@ class MatchEngine:
 
         if self.rng.random() < tov_prob:
             # 스틸 or 헛패스
-            stealer = self.rng.choice(defense.rotation_players)
+            def _weighted_pick(players: List[Player], weights: List[float]) -> Player:
+                total_w = sum(weights)
+                r = self.rng.random() * total_w
+                acc = 0.0
+                for pl, w in zip(players, weights):
+                    acc += w
+                    if r <= acc:
+                        return pl
+                return players[-1]
+
+            bh_weights = []
+            for p in offense.rotation_players:
+                handle = p.ratings.get("Ball Handle", 70.0)
+                w = p.usage_weight * max(0.0, 110.0 - handle)
+                bh_weights.append(max(0.1, w))
+
+            stl_weights = []
+            for p in defense.rotation_players:
+                rating = p.ratings.get("Steal", 70.0) * 0.7 + p.ratings.get("Perimeter Defense", 70.0) * 0.3
+                stl_weights.append(max(0.1, rating))
+
+            ballhandler = _weighted_pick(offense.rotation_players, bh_weights)
+            stealer = _weighted_pick(defense.rotation_players, stl_weights)
+
             stealer.inc("STL", 1)
-            ballhandler = self.rng.choice(offense.rotation_players)
             ballhandler.inc("TOV", 1)
             return True
         return False
@@ -713,6 +752,25 @@ class MatchEngine:
         foul_drawn = self.rng.random() < foul_prob
         made = self.rng.random() < prob
 
+        if foul_drawn and defense.rotation_players:
+            weights = []
+            for p in defense.rotation_players:
+                rating = (
+                    p.ratings.get("Perimeter Defense", 70.0) * 0.4
+                    + p.ratings.get("Defense", 70.0) * 0.4
+                    + p.ratings.get("Steal", 70.0) * 0.2
+                )
+                weights.append(max(0.1, rating))
+
+            total = sum(weights)
+            r = self.rng.random() * total
+            acc = 0.0
+            for p, w in zip(defense.rotation_players, weights):
+                acc += w
+                if r <= acc:
+                    p.inc("PF", 1)
+                    break
+
         is_three = (shot_type == "three")
         ft_count = 0
         if foul_drawn:
@@ -739,7 +797,7 @@ class MatchEngine:
     # -----------------------------
     # 리바운드
     # -----------------------------
-    def _resolve_rebound(self, offense: Team, defense: Team) -> None:
+    def _resolve_rebound(self, offense: Team, defense: Team) -> Team:
         off_reb = offense.avg("Offensive Rebound")
         def_reb = defense.avg("Defensive Rebound")
         def_scheme = defense.tactics.get("defense_scheme", "drop_coverage")
@@ -781,6 +839,8 @@ class MatchEngine:
             if r <= acc:
                 p.inc("REB", 1)
                 break
+
+        return reb_team
 
     # -----------------------------
     # 어시스트
@@ -848,4 +908,5 @@ class MatchEngine:
             "3PA": int(s.get("3PA", 0.0)),
             "FTM": int(s.get("FTM", 0.0)),
             "FTA": int(s.get("FTA", 0.0)),
+            "PF": int(s.get("PF", 0.0)),
         }

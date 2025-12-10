@@ -20,7 +20,9 @@ let appState = {
   // ✅ LLM 대화 히스토리 (최근 N턴만 컨텍스트에 사용)
   chatHistory: [],
   // 어떤 팀의 퍼스트 메시지를 이미 보여줬는지 기록
-  firstMessageShownTeams: {}
+  firstMessageShownTeams: {},
+  // 팀별 전술 상태 저장
+  tacticsByTeam: {}
 };
 
 // 간단한 팀 데이터 (프런트 전용 메타)
@@ -69,6 +71,28 @@ const DIVISIONS = {
     Southeast: ['ATL', 'CHA', 'MIA', 'ORL', 'WAS']
   }
 };
+
+function getDefaultTactics() {
+  return {
+    pace: 0,
+    offenseScheme: 'pace_space',
+    defenseScheme: 'drop_coverage',
+    rotationSize: 9,
+    starters: [],
+    bench: []
+  };
+}
+
+function getOrCreateTacticsForTeam(teamId) {
+  if (!teamId) return null;
+  if (!appState.tacticsByTeam) {
+    appState.tacticsByTeam = {};
+  }
+  if (!appState.tacticsByTeam[teamId]) {
+    appState.tacticsByTeam[teamId] = getDefaultTactics();
+  }
+  return appState.tacticsByTeam[teamId];
+}
 
 function getTeamConfAndDiv(teamId) {
   for (const [conf, divs] of Object.entries(DIVISIONS)) {

@@ -70,6 +70,33 @@ function calcFatigueFactor(restDays) {
   return 1.05;                     // 4일 이상 푹 쉼
 }
 
+// 팀 전술 객체 생성 (match_engine 기대 포맷)
+function buildTacticsForTeam(teamId, fatigueFactor) {
+  const userTeam = appState.selectedTeam;
+  const isUserTeam = userTeam && userTeam.id === teamId;
+
+  if (isUserTeam) {
+    const tactics = getOrCreateTacticsForTeam(teamId);
+    return {
+      pace: tactics.pace ?? 0,
+      offense_scheme: tactics.offenseScheme || 'pace_space',
+      defense_scheme: tactics.defenseScheme || 'drop_coverage',
+      rotation_size: tactics.rotationSize || 9,
+      lineup: {
+        starters: tactics.starters || [],
+        bench: tactics.bench || []
+      },
+      fatigue_factor: fatigueFactor
+    };
+  }
+
+  // 상대 팀은 기본값(페이스/피로만) 전달
+  return {
+    pace: 0,
+    fatigue_factor: fatigueFactor
+  };
+}
+
 // 시즌 스케줄을 서버에서 받아오기 (신버전: /api/team-schedule/{teamId})
 async function generateSeasonSchedule(teamId) {
   const schedule = appState.cachedViews.schedule;
@@ -219,22 +246,17 @@ async function simulateGameProgress() {
 
   // 🔹 3) 우리 팀 경기 시뮬레이션 (/api/simulate-game)
   try {
+    const homeTactics = buildTacticsForTeam(homeTeam.id, homeFatigue);
+    const awayTactics = buildTacticsForTeam(awayTeam.id, awayFatigue);
+
     const res = await fetch("/api/simulate-game", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         home_team_id: homeTeam.id,
         away_team_id: awayTeam.id,
-        home_tactics: {
-          focus: "balanced",
-          pace: 0,
-          fatigue_factor: homeFatigue
-        },
-        away_tactics: {
-          focus: "balanced",
-          pace: 0,
-          fatigue_factor: awayFatigue
-        },
+        home_tactics: homeTactics,
+        away_tactics: awayTactics,
         game_date: gameDate
       })
     });
