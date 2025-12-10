@@ -241,6 +241,10 @@ async function loadRosterForTeam(teamId) {
     }
     const data = await res.json();
     appState.rosters[teamId] = data;
+    applyRosterToTacticsIfNeeded(teamId);
+    if (appState.selectedTeam && appState.selectedTeam.id === teamId) {
+      renderTacticsTab();
+    }
   } catch (e) {
     console.warn('로스터 요약 불러오기 오류:', e);
   }

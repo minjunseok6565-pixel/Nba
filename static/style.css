@@ -198,6 +198,137 @@ button[disabled] { opacity:0.55; cursor:default; box-shadow:none; }
   box-shadow:0 6px 16px rgba(15,23,42,0.15);
   transform:translateY(-1px);
 }
+
+.tactics-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.tactics-section {
+  flex: 1 1 320px;
+  background: #111827;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.05);
+  color: #f9fafb;
+}
+
+.tactics-section h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.tactics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.tactics-row label {
+  min-width: 110px;
+  font-size: 0.9rem;
+}
+
+.tactics-row input[type="range"] {
+  flex: 1;
+}
+
+.tactics-pace-label {
+  min-width: 110px;
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+.tactics-lineup-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.tactics-lineup-container {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tactics-lineup-column {
+  flex: 1;
+  min-height: 80px;
+  background: #020617;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.85rem;
+}
+
+.tactics-player-tag {
+  background: #1f2937;
+  border-radius: 999px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.tactics-roster-list-wrapper {
+  margin-top: 12px;
+}
+
+.tactics-roster-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: #020617;
+  padding: 8px;
+}
+
+.tactics-roster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.tactics-roster-row:hover {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.tactics-roster-info {
+  font-size: 0.85rem;
+}
+
+.tactics-roster-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tactics-role-button {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: transparent;
+  cursor: pointer;
+  color: #e5e7eb;
+}
+
+.tactics-role-button.selected {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #020617;
+}
+
+.tactics-lineup-summary {
+  margin-top: 6px;
+  font-size: 0.8rem;
+}
 .team-card.selected {
   border-color:var(--accent);
   box-shadow:0 6px 18px rgba(200,16,46,0.35);

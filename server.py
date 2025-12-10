@@ -326,14 +326,18 @@ async def roster_summary(team_id: str):
         raise HTTPException(status_code=404, detail=f"Team '{team_id}' not found in roster excel")
 
     players: List[Dict[str, Any]] = []
-    for _, row in team_df.iterrows():
+    for idx, row in team_df.iterrows():
+        try:
+            player_id = int(idx)
+        except (TypeError, ValueError):
+            player_id = str(idx)
+
         players.append({
+            "player_id": player_id,
             "name": row["Name"],
             "pos": str(row.get("POS", "")),
             "overall": float(row.get("OVR", 0.0)) if "OVR" in team_df.columns else 0.0,
         })
-
-    players = sorted(players, key=lambda x: x["overall"], reverse=True)
 
     return {
         "team_id": team_id,
