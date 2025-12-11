@@ -26,6 +26,7 @@ from team_utils import (
     get_team_cards,
     get_team_detail,
 )
+from season_report_ai import generate_season_report
 
 
 # -------------------------------------------------------------------------
@@ -90,6 +91,11 @@ class WeeklyNewsRequest(BaseModel):
 
 class ApiKeyRequest(BaseModel):
     apiKey: str
+
+
+class SeasonReportRequest(BaseModel):
+    apiKey: str
+    user_team_id: str
 
 
 # -------------------------------------------------------------------------
@@ -215,6 +221,21 @@ async def api_news_week(req: WeeklyNewsRequest):
         return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weekly news generation failed: {e}")
+
+
+@app.post("/api/season-report")
+async def api_season_report(req: SeasonReportRequest):
+    """정규 시즌 종료 후, LLM을 이용해 시즌 결산 리포트를 생성한다."""
+    if not req.apiKey:
+        raise HTTPException(status_code=400, detail="apiKey is required")
+
+    try:
+        report_text = generate_season_report(req.apiKey, req.user_team_id)
+        return {"report_markdown": report_text}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Season report generation failed: {e}")
 
 
 @app.post("/api/validate-key")
