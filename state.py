@@ -31,9 +31,6 @@ GAME_STATE: Dict[str, Any] = {
         "schedule": {
             "teams": {}  # team_id -> {past_games: [], upcoming_games: []}
         },
-        "news": {
-            "items": []  # 간단 뉴스 피드
-        },
         "stats": {
             "leaders": None,
         },
@@ -374,18 +371,6 @@ def update_state_with_game(
             "result_for_user_team": result,
         })
 
-    # 간단 뉴스 항목 추가
-    news_items = GAME_STATE["cached_views"]["news"]["items"]
-    news_items.insert(0, {
-        "news_id": f"news_{game_id}",
-        "date": game_date_str,
-        "importance": "normal",
-        "tags": ["game_result"],
-        "title": f"{home_id} {home_score} - {away_id} {away_score}",
-        "summary": "파이썬 매치 엔진 결과를 바탕으로 생성된 간단한 경기 결과입니다.",
-        "related_team_ids": [home_id, away_id],
-        "related_player_ids": [],
-    })
 
     # 마스터 스케줄에 해당 경기가 존재한다면 결과도 반영
     _mark_master_schedule_game_final(
@@ -440,6 +425,7 @@ def _update_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]
                     )
                 except (TypeError, ValueError):
                     continue
+
 
 
 def get_schedule_summary() -> Dict[str, Any]:
