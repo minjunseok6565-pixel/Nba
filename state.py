@@ -35,10 +35,11 @@ GAME_STATE: Dict[str, Any] = {
             "leaders": None,
         },
         "weekly_news": {
-            "last_generated_week_start": None,
-            "items": [],
+        "last_generated_week_start": None,
+        "items": [],
         },
     },
+    "postseason": {},  # 플레이-인/플레이오프 시뮬레이션 결과 캐시
     "league": {
         "season_year": None,
         "season_start": None,  # YYYY-MM-DD
