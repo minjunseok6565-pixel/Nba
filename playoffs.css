@@ -167,6 +167,14 @@ h3 {
   color: #c8102e;
 }
 
+.empty-state,
+.empty-state-row td {
+  color: #777;
+  font-size: 13px;
+  text-align: center;
+  padding: 14px 10px;
+}
+
 .btn-row {
   display: flex;
   flex-wrap: wrap;
@@ -230,6 +238,12 @@ h3 {
 .btn-ghost:hover {
   background: rgba(0, 0, 0, 0.04);
   box-shadow: none;
+}
+
+.btn-ghost.active {
+  background: rgba(200, 16, 46, 0.08);
+  color: #c8102e;
+  border-color: rgba(200, 16, 46, 0.08);
 }
 
 .label {
