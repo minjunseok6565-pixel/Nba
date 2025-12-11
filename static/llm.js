@@ -79,7 +79,14 @@ async function sendToMainLLM() {
   }
 
   isLLMLoading = true;
-  setLLMLoadingStatus('main', true, 'LLM 응답 생성 중...');
+  const simIntent = detectSimulationIntent(userInput);
+  setLLMLoadingStatus(
+    'main',
+    true,
+    simIntent.shouldSimulate
+      ? '경기 시뮬레이션 및 브리핑 중...'
+      : 'LLM 응답 생성 중...'
+  );
   btnSendToLLM.disabled = true;
 
   try {
@@ -90,11 +97,33 @@ async function sendToMainLLM() {
     // 메인 LLM 컨텍스트 생성
     const context = buildContextForLLM();
 
+    // 사용자가 시뮬레이션을 요청했다면 먼저 매치 엔진을 돌린다.
+    let augmentedUserInput = userInput;
+    let simulatedGames = [];
+    if (simIntent.shouldSimulate) {
+      simulatedGames = await runLLMSimulationWorkflow(simIntent.gamesToSimulate);
+
+      if (simulatedGames.length > 0) {
+        context.simulatedGames = simulatedGames;
+        const summaryText = formatSimulationSummary(simulatedGames);
+        augmentedUserInput =
+          `${userInput}\n\n` +
+          '[시뮬레이션 결과]\n' +
+          `${summaryText}\n` +
+          '위 결과를 바탕으로 핵심 하이라이트와 관전 포인트를 요약해서 브리핑해줘.';
+      } else {
+        augmentedUserInput =
+          `${userInput}\n\n` +
+          '[시뮬레이션 실패] 실제 경기를 실행하지 못했습니다. 가능한 원인을 알려주세요.';
+      }
+    }
+
     const payload = {
       apiKey: appState.apiKey,
       mainPrompt: (mainPromptTextarea?.value || '').trim(),
-      userInput,
-      userMessage: userInput,
+      // 백엔드 Pydantic 모델이 userMessage(alias) 필드를 요구하므로 두 키 모두 채운다.
+      userInput: augmentedUserInput,
+      userMessage: augmentedUserInput,
       context: JSON.stringify(context)
     };
 
@@ -165,6 +194,50 @@ function buildContextForLLM() {
     latestGames: latestGamesText,
     history
   };
+}
+
+function detectSimulationIntent(message) {
+  const lower = (message || '').toLowerCase();
+  const hasSimKeyword =
+    lower.includes('시뮬') ||
+    lower.includes('시뮬레이션') ||
+    lower.includes('simulate') ||
+    lower.includes('경기 진행') ||
+    lower.includes('게임 진행') ||
+    lower.includes('매치 엔진');
+
+  if (!hasSimKeyword) {
+    return { shouldSimulate: false, gamesToSimulate: 0 };
+  }
+
+  const numberMatch = message.match(/(\d+)\s*(경기|게임|matches?|games?)/i);
+  const gamesToSimulate = numberMatch ? Math.max(1, parseInt(numberMatch[1], 10)) : 1;
+
+  return { shouldSimulate: true, gamesToSimulate };
+}
+
+async function runLLMSimulationWorkflow(gamesToSimulate) {
+  const results = [];
+
+  for (let i = 0; i < gamesToSimulate; i += 1) {
+    const result = await simulateGameProgress();
+    if (!result || result.success === false) {
+      break;
+    }
+    results.push(result);
+  }
+
+  return results;
+}
+
+function formatSimulationSummary(simulatedGames) {
+  return simulatedGames
+    .map(g => {
+      const matchup = `${g.home_team_name} ${g.home_score} - ${g.away_score} ${g.away_team_name}`;
+      const outcome = g.result_for_user_team === 'W' ? '승리' : '패배';
+      return `${g.game_date} · ${matchup} (${outcome})`;
+    })
+    .join('\n');
 }
 
 // 보조 LLM: 경기 후 상태 업데이트 등에 사용
