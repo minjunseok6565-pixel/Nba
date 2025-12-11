@@ -166,6 +166,59 @@ async function generateSeasonSchedule(teamId) {
   }
 }
 
+async function requestSeasonReportForUserTeam() {
+  const teamId = appState.selectedTeam?.id || appState.cachedViews.schedule?.teamId || TEAMS[0]?.id;
+
+  if (!appState.apiKey) {
+    alert("먼저 상단에서 Gemini API 키를 입력해주세요.");
+    return null;
+  }
+
+  if (!teamId) {
+    alert("팀 정보를 찾을 수 없습니다. 시즌 결산을 진행할 수 없습니다.");
+    return null;
+  }
+
+  if (typeof homeLLMOutput !== "undefined" && homeLLMOutput) {
+    homeLLMOutput.textContent = "시즌 결산 리포트를 생성하는 중입니다...";
+  }
+
+  try {
+    const res = await fetch("/api/season-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey: appState.apiKey,
+        user_team_id: teamId
+      })
+    });
+
+    if (!res.ok) {
+      console.error("시즌 결산 API 에러:", await res.text());
+      alert("시즌 결산 리포트 생성에 실패했습니다. 콘솔을 확인해주세요.");
+      return null;
+    }
+
+    const data = await res.json();
+    const reportText = (
+      data.report_markdown ||
+      data.report ||
+      data.text ||
+      ""
+    ).trim();
+
+    if (typeof homeLLMOutput !== "undefined" && homeLLMOutput) {
+      homeLLMOutput.textContent = reportText || "(빈 리포트)";
+    }
+
+    return reportText;
+  } catch (err) {
+    console.error("시즌 결산 리포트 생성 중 오류:", err);
+    alert("시즌 결산 리포트 생성 중 오류가 발생했습니다.");
+    return null;
+  }
+}
+
 // 메인 경기 시뮬레이션 함수 (신버전 엔드포인트만 사용)
 async function simulateGameProgress() {
   const userTeam = appState.selectedTeam || TEAMS[0];
@@ -181,8 +234,53 @@ async function simulateGameProgress() {
 
   const nextGame = getNextScheduledGame();
   if (!nextGame) {
+    // 1) 시즌 종료 알림
     alert("더 이상 남은 정규시즌 경기가 없습니다.");
-    return false;
+
+    // 2) 시즌 결산 안내 알림
+    alert("시즌 결산에 돌입합니다.");
+
+    // 3) 시즌 결산 리포트 생성 호출
+    try {
+      if (appState.apiKey && appState.selectedTeam &&
+          typeof homeLLMOutput !== "undefined" && homeLLMOutput) {
+        const res = await fetch("/api/season-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            apiKey: appState.apiKey,
+            user_team_id: appState.selectedTeam.id
+          })
+        });
+
+        if (!res.ok) {
+          const msg = await res.text();
+          console.error("season-report API 에러:", msg);
+          alert("시즌 결산 리포트를 생성하는 중 오류가 발생했습니다.");
+        } else {
+          const data = await res.json();
+          const report =
+            (data && (data.report_markdown || data.report)) || "";
+
+          if (report) {
+            // Home 탭 LLM 응답 박스에 표시
+            homeLLMOutput.textContent = report;
+            homeLLMOutput.classList.remove("muted");
+          } else {
+            homeLLMOutput.textContent =
+              "시즌 결산 리포트를 생성하지 못했습니다.";
+          }
+        }
+      } else {
+        console.warn("apiKey 또는 selectedTeam이 없어 시즌 결산을 호출하지 못했습니다.");
+      }
+    } catch (e) {
+      console.error("season-report 호출 중 예외:", e);
+      alert("시즌 결산 리포트를 생성하는 중 오류가 발생했습니다. (콘솔 로그 참고)");
+    }
+
+    // 시뮬레이션 호출자는 더 이상 진행할 경기가 없음을 알 수 있어야 한다.
+    return { success: false, reason: "no-more-regular-season" };
   }
 
   const homeTeam =
