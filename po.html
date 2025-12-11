@@ -140,85 +140,6 @@
       });
     });
 
-    const samplePlayoffState = {
-      roundLabel: "Conference 1st Round",
-      matchup: {
-        userTeam: { name: "Team Alpha", seed: 2, record: "2-0" },
-        opponent: { name: "Team Beta", seed: 7, record: "0-2" },
-      },
-      format: "Best of 7",
-      nextGame: "Game 3 · 홈",
-      tipoff: "Tip-off 19:30",
-      notes: ["최근 2경기 연속 승리", "Paint 득점 비중 52%"],
-      topBar: [
-        { label: "시리즈", value: "1R vs Team Beta" },
-        { label: "현재 스코어", value: "2–0 리드" },
-        { label: "다음 경기", value: "Game 3 · 홈" },
-      ],
-      bracket: [
-        {
-          conference: "Eastern Conference",
-          rounds: [
-            {
-              title: "1R",
-              series: [
-                {
-                  lines: [
-                    { seed: 1, team: "Team A", record: 4 },
-                    { seed: 8, team: "Team H", record: 1 },
-                  ],
-                  status: "Series Won 4–1",
-                },
-              ],
-            },
-            { title: "Semis", series: [] },
-            { title: "Finals", series: [] },
-          ],
-        },
-        {
-          conference: "Western Conference",
-          rounds: [
-            {
-              title: "1R",
-              series: [
-                {
-                  lines: [
-                    { seed: 2, team: "Team Alpha", record: 2 },
-                    { seed: 7, team: "Team Beta", record: 0 },
-                  ],
-                  status: "Series in progress",
-                },
-              ],
-            },
-            { title: "Semis", series: [] },
-            { title: "Finals", series: [] },
-          ],
-        },
-      ],
-      statsCategories: ["PTS", "REB", "AST", "FG%"],
-      stats: [
-        {
-          rank: 1,
-          player: "Player One",
-          team: "ALP",
-          games: 2,
-          minutes: 35.2,
-          points: 28.5,
-          rebounds: 6.0,
-          assists: 7.0,
-          fg: 52.1,
-          detail: "G",
-        },
-      ],
-      news: [
-        {
-          headline: "플레이오프 시리즈가 시작되었습니다.",
-          meta: "리그 업데이트",
-          body: "시리즈 진행 상황은 게임이 끝나면 자동으로 갱신됩니다.",
-        },
-      ],
-    };
-
     function renderTopBar(meta = []) {
       const container = document.getElementById("poTopBarMeta");
       container.innerHTML = "";
@@ -234,16 +155,16 @@
       });
     }
 
-    function renderSeriesCard(state) {
-      const roundLabel = document.getElementById("poSeriesRoundLabel");
+    function renderSeriesCard(series, roundName = "") {
+      const roundLabelEl = document.getElementById("poSeriesRoundLabel");
       const matchupRow = document.getElementById("poSeriesMatchup");
       const meta = document.getElementById("poSeriesMeta");
       const chips = document.getElementById("poSeriesChips");
       const title = document.getElementById("poScreenTitle");
       const sub = document.getElementById("poScreenSub");
 
-      if (!state) {
-        roundLabel.textContent = "시리즈 정보 없음";
+      if (!series) {
+        roundLabelEl.textContent = "시리즈 정보 없음";
         matchupRow.innerHTML = '<div class="empty-state">시리즈 매치업이 없습니다.</div>';
         meta.textContent = "";
         chips.innerHTML = "";
@@ -252,31 +173,39 @@
         return;
       }
 
-      roundLabel.textContent = state.roundLabel || "시리즈";
-      title.textContent = `플레이오프 · ${state.roundLabel || "시리즈"}`;
-      sub.textContent = `${state.matchup?.userTeam?.name || "Home"} vs ${
-        state.matchup?.opponent?.name || "Away"
-      }`;
+      const homeId = series.home_court;
+      const roadId = series.road;
+      const wins = series.wins || {};
+      const bestOf = series.best_of || 7;
+      const gamesPlayed = (series.games || []).length;
+      const homeSeed = series.home_entry?.seed ?? "-";
+      const roadSeed = series.road_entry?.seed ?? "-";
+      const homeLabel = series.home_entry?.team_id || homeId || "Home Team";
+      const roadLabel = series.road_entry?.team_id || roadId || "Away Team";
+
+      roundLabelEl.textContent = roundName || series.round || "시리즈";
+      title.textContent = `플레이오프 · ${roundName || series.round || "시리즈"}`;
+      sub.textContent = `${homeLabel} vs ${roadLabel}`;
 
       matchupRow.innerHTML = "";
       const userBlock = document.createElement("div");
       userBlock.className = "po-team-block po-team-user";
       userBlock.innerHTML = `
         <div class="po-team-name">
-          ${state.matchup?.userTeam?.name || "Home Team"}
-          <span>(${state.matchup?.userTeam?.seed ?? "-"})</span>
+          ${homeLabel}
+          <span>(${homeSeed})</span>
         </div>
-        <div class="po-team-record">${state.matchup?.userTeam?.record || "-"}</div>
+        <div class="po-team-record">${wins[homeId] ?? 0}승</div>
       `;
 
       const oppBlock = document.createElement("div");
       oppBlock.className = "po-team-block po-team-opponent";
       oppBlock.innerHTML = `
         <div class="po-team-name">
-          ${state.matchup?.opponent?.name || "Away Team"}
-          <span>(${state.matchup?.opponent?.seed ?? "-"})</span>
+          ${roadLabel}
+          <span>(${roadSeed})</span>
         </div>
-        <div class="po-team-record">${state.matchup?.opponent?.record || "-"}</div>
+        <div class="po-team-record">${wins[roadId] ?? 0}승</div>
       `;
 
       const vs = document.createElement("div");
@@ -288,26 +217,31 @@
       matchupRow.appendChild(oppBlock);
 
       meta.innerHTML = "";
-      [state.format, state.nextGame, state.tipoff]
-        .filter(Boolean)
-        .forEach((text, index, arr) => {
-          const span = document.createElement("span");
-          span.textContent = text;
-          meta.appendChild(span);
-          if (index < arr.length - 1) {
-            const dot = document.createElement("span");
-            dot.className = "dot";
-            meta.appendChild(dot);
-          }
-        });
+      const metaItems = [
+        series.matchup ? `매치업: ${series.matchup}` : null,
+        bestOf ? `시리즈: ${bestOf}전 ${Math.floor(bestOf / 2) + 1}선승` : null,
+        gamesPlayed || gamesPlayed === 0 ? `진행 경기: ${gamesPlayed}` : null,
+      ].filter(Boolean);
+
+      metaItems.forEach((text, index) => {
+        const span = document.createElement("span");
+        span.textContent = text;
+        meta.appendChild(span);
+        if (index < metaItems.length - 1) {
+          const dot = document.createElement("span");
+          dot.className = "dot";
+          meta.appendChild(dot);
+        }
+      });
 
       chips.innerHTML = "";
-      (state.notes || []).forEach((note, idx) => {
-        const chip = document.createElement("span");
-        chip.className = "po-series-chip" + (idx === 0 ? " po-series-chip-highlight" : "");
-        chip.textContent = note;
-        chips.appendChild(chip);
-      });
+      const winnerTeam = series.winner?.team_id || series.winner;
+      const statusChip = document.createElement("span");
+      statusChip.className = "po-series-chip";
+      statusChip.textContent = winnerTeam
+        ? `시리즈 종료 · 우승: ${winnerTeam}`
+        : "시리즈 진행 중";
+      chips.appendChild(statusChip);
 
       const buttons = [
         document.getElementById("poBtnTactics"),
@@ -317,42 +251,71 @@
       buttons.forEach((btn) => (btn.disabled = false));
     }
 
-    function renderBracket(bracketData = []) {
+    function renderBracket(playoffs = null) {
       const grid = document.getElementById("poBracketGrid");
       grid.innerHTML = "";
-      if (!bracketData.length) {
+      if (!playoffs || !playoffs.bracket) {
         grid.innerHTML = '<div class="empty-state">브라켓 정보가 아직 없습니다.</div>';
         return;
       }
 
-      bracketData.forEach((conf) => {
+      const bracket = playoffs.bracket;
+      const conferences = [
+        { key: "east", title: "Eastern Conference" },
+        { key: "west", title: "Western Conference" },
+      ];
+
+      conferences.forEach((conf) => {
         const column = document.createElement("div");
         column.className = "po-bracket-column";
         column.innerHTML = `
           <div class="po-bracket-title-row">
-            <h3>${conf.conference}</h3>
+            <h3>${conf.title}</h3>
             <span class="label">시리즈 진행 상황</span>
           </div>
         `;
         const rounds = document.createElement("div");
         rounds.className = "po-bracket-rounds";
 
-        (conf.rounds || []).forEach((round) => {
+        const confBracket = bracket[conf.key] || {};
+        const roundDefs = [
+          { title: "1R", list: confBracket.quarterfinals || [] },
+          { title: "Semis", list: confBracket.semifinals || [] },
+          { title: "Finals", list: confBracket.finals ? [confBracket.finals] : [] },
+        ];
+
+        roundDefs.forEach((round) => {
           const roundEl = document.createElement("div");
           roundEl.className = "po-bracket-round";
           roundEl.innerHTML = `<div class="po-round-title">${round.title}</div>`;
 
-          if (!round.series?.length) {
+          if (!round.list?.length) {
             const placeholder = document.createElement("div");
             placeholder.className = "muted";
             placeholder.textContent = "매치업이 준비 중입니다.";
             roundEl.appendChild(placeholder);
           }
 
-          (round.series || []).forEach((series) => {
+          (round.list || []).forEach((series) => {
             const seriesEl = document.createElement("div");
             seriesEl.className = "po-series-mini";
-            series.lines?.forEach((line) => {
+            const wins = series.wins || {};
+            const homeId = series.home_court;
+            const roadId = series.road;
+            const lines = [
+              {
+                seed: series.home_entry?.seed ?? "-",
+                team: series.home_entry?.team_id || homeId || "-",
+                record: wins[homeId] ?? 0,
+              },
+              {
+                seed: series.road_entry?.seed ?? "-",
+                team: series.road_entry?.team_id || roadId || "-",
+                record: wins[roadId] ?? 0,
+              },
+            ];
+
+            lines.forEach((line) => {
               const lineEl = document.createElement("div");
               lineEl.className = "po-series-line";
               lineEl.innerHTML = `
@@ -362,12 +325,12 @@
               `;
               seriesEl.appendChild(lineEl);
             });
-            if (series.status) {
-              const status = document.createElement("div");
-              status.className = "series-status";
-              status.textContent = series.status;
-              seriesEl.appendChild(status);
-            }
+            const status = document.createElement("div");
+            status.className = "series-status";
+            status.textContent = series.winner?.team_id
+              ? `종료 · ${series.winner.team_id}`
+              : "진행 중";
+            seriesEl.appendChild(status);
             roundEl.appendChild(seriesEl);
           });
 
@@ -377,6 +340,66 @@
         column.appendChild(rounds);
         grid.appendChild(column);
       });
+
+      if (bracket.finals) {
+        const finalsCol = document.createElement("div");
+        finalsCol.className = "po-bracket-column";
+        finalsCol.innerHTML = `
+          <div class="po-bracket-title-row">
+            <h3>NBA Finals</h3>
+            <span class="label">최종 라운드</span>
+          </div>
+        `;
+        const rounds = document.createElement("div");
+        rounds.className = "po-bracket-rounds";
+
+        const roundEl = document.createElement("div");
+        roundEl.className = "po-bracket-round";
+        roundEl.innerHTML = `<div class="po-round-title">Finals</div>`;
+
+        const series = bracket.finals;
+        if (series) {
+          const seriesEl = document.createElement("div");
+          seriesEl.className = "po-series-mini";
+          const wins = series.wins || {};
+          const homeId = series.home_court;
+          const roadId = series.road;
+          const lines = [
+            {
+              seed: series.home_entry?.seed ?? "-",
+              team: series.home_entry?.team_id || homeId || "-",
+              record: wins[homeId] ?? 0,
+            },
+            {
+              seed: series.road_entry?.seed ?? "-",
+              team: series.road_entry?.team_id || roadId || "-",
+              record: wins[roadId] ?? 0,
+            },
+          ];
+
+          lines.forEach((line) => {
+            const lineEl = document.createElement("div");
+            lineEl.className = "po-series-line";
+            lineEl.innerHTML = `
+              <span class="seed">${line.seed ?? "-"}</span>
+              <span class="team-code">${line.team || "-"}</span>
+              <span class="record">${line.record ?? "-"}</span>
+            `;
+            seriesEl.appendChild(lineEl);
+          });
+          const status = document.createElement("div");
+          status.className = "series-status";
+          status.textContent = series.winner?.team_id
+            ? `종료 · ${series.winner.team_id}`
+            : "진행 중";
+          seriesEl.appendChild(status);
+          roundEl.appendChild(seriesEl);
+        }
+
+        rounds.appendChild(roundEl);
+        finalsCol.appendChild(rounds);
+        grid.appendChild(finalsCol);
+      }
     }
 
     function renderStats(categories = [], stats = []) {
@@ -414,6 +437,69 @@
       });
     }
 
+    async function fetchJson(url, options = {}) {
+      try {
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        console.error("플레이오프 데이터 요청 실패", err);
+        return null;
+      }
+    }
+
+    function findSeriesForTeam(playoffs, teamId) {
+      if (!playoffs || !teamId) return null;
+      const bracket = playoffs.bracket || {};
+      const roundName = playoffs.current_round || "Conference Quarterfinals";
+      const roundSeries = (function () {
+        if (roundName === "Conference Quarterfinals") {
+          return (bracket.east?.quarterfinals || []).concat(
+            bracket.west?.quarterfinals || []
+          );
+        }
+        if (roundName === "Conference Semifinals") {
+          return (bracket.east?.semifinals || []).concat(bracket.west?.semifinals || []);
+        }
+        if (roundName === "Conference Finals") {
+          return (bracket.east?.finals ? [bracket.east.finals] : []).concat(
+            bracket.west?.finals ? [bracket.west.finals] : []
+          );
+        }
+        if (roundName === "NBA Finals") {
+          return bracket.finals ? [bracket.finals] : [];
+        }
+        return [];
+      })();
+
+      return roundSeries.find(
+        (series) => series && [series.home_court, series.road].includes(teamId)
+      );
+    }
+
+    function buildTopBarMeta(playoffs, series, myTeamId) {
+      if (!playoffs || !series) return [];
+      const wins = series.wins || {};
+      const homeId = series.home_court;
+      const roadId = series.road;
+      const scoreLabel = `${wins[homeId] ?? 0}-${wins[roadId] ?? 0}`;
+      const pills = [
+        { label: "현재 라운드", value: playoffs.current_round || "-" },
+        { label: "시리즈", value: series.matchup || `${homeId || "-"} vs ${roadId || "-"}` },
+        { label: "현재 스코어", value: scoreLabel },
+      ];
+
+      if (myTeamId) {
+        pills.push({ label: "내 팀", value: myTeamId, strong: true });
+      }
+
+      if (series.winner?.team_id) {
+        pills.push({ label: "승자", value: series.winner.team_id, strong: true });
+      }
+
+      return pills;
+    }
+
     function renderNews(news = []) {
       const feed = document.getElementById("poNewsFeed");
       feed.innerHTML = "";
@@ -439,12 +525,22 @@
       });
     }
 
-    // 기본 렌더링: 실제 데이터가 없을 경우 샘플 구조를 사용하여 화면을 유지합니다.
-    renderTopBar(samplePlayoffState.topBar);
-    renderSeriesCard(samplePlayoffState);
-    renderBracket(samplePlayoffState.bracket);
-    renderStats(samplePlayoffState.statsCategories, samplePlayoffState.stats);
-    renderNews(samplePlayoffState.news);
+    async function loadPlayoffsScreen() {
+      const postseason = await fetchJson("/api/postseason/state");
+      const playoffs = postseason?.playoffs || null;
+      const myTeamId = postseason?.my_team_id || null;
+      const mySeries = findSeriesForTeam(playoffs, myTeamId) || null;
+
+      renderTopBar(buildTopBarMeta(playoffs, mySeries, myTeamId));
+      renderSeriesCard(mySeries, playoffs?.current_round || "");
+      renderBracket(playoffs);
+
+      // Stats/News endpoints are not wired yet; keep empty states until backend supplies them.
+      renderStats([], []);
+      renderNews([]);
+    }
+
+    loadPlayoffsScreen();
   </script>
 </body>
 </html>
