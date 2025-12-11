@@ -16,7 +16,6 @@ from state import (
     GAME_STATE,
     _ensure_league_state,
     initialize_master_schedule_if_needed,
-    apply_state_update,
     get_schedule_summary,
 )
 from league_sim import simulate_single_game, advance_league_until
@@ -78,13 +77,6 @@ class ChatMainRequest(BaseModel):
         allow_population_by_field_name = True
         allow_population_by_alias = True
         fields = {"userInput": "userMessage"}
-
-
-class StateUpdateRequest(BaseModel):
-    apiKey: str
-    subPrompt: Optional[str] = ""
-    engineOutput: Dict[str, Any]
-    currentState: Optional[Dict[str, Any]] = None
 
 
 class AdvanceLeagueRequest(BaseModel):
@@ -273,61 +265,6 @@ async def chat_main(req: ChatMainRequest):
 async def chat_main_legacy(req: ChatMainRequest):
     """프론트 JS가 /api/main-llm, userMessage 필드로 호출하던 버전을 위한 호환 엔드포인트."""
     return await chat_main(req)
-
-
-# -------------------------------------------------------------------------
-# 서브 LLM (STATE_UPDATE 생성용) API
-# -------------------------------------------------------------------------
-@app.post("/api/state-update")
-async def state_update(req: StateUpdateRequest):
-    """파이썬 매치엔진 결과 + 현재 STATE로 Gemini가 STATE_UPDATE JSON을 생성하게 한다."""
-    if not req.apiKey:
-        raise HTTPException(status_code=400, detail="apiKey is required")
-
-    try:
-        genai.configure(api_key=req.apiKey)
-        model = genai.GenerativeModel(
-            model_name="gemini-3-pro-preview",
-            system_instruction=req.subPrompt or "",
-        )
-
-        payload = {
-            "engine_output": req.engineOutput,
-            "current_state": req.currentState or GAME_STATE,
-        }
-        prompt = json.dumps(payload, ensure_ascii=False, indent=2)
-        resp = model.generate_content(prompt)
-        raw_text = extract_text_from_gemini_response(resp)
-
-        # JSON 파싱 시도
-        cleaned = raw_text
-        # ```json ... ``` 형태로 wrapping 되어 있다면 제거
-        if cleaned.strip().startswith("```"):
-            parts = cleaned.split("```")
-            if len(parts) >= 3:
-                cleaned = parts[1]
-        cleaned = cleaned.strip()
-
-        try:
-            parsed = json.loads(cleaned)
-        except Exception:
-            parsed = None
-
-        if parsed:
-            apply_state_update(parsed)
-
-        return {
-            "raw": raw_text,
-            "parsed": parsed,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini sub/state-update error: {e}")
-
-
-@app.post("/api/state-update-llm")
-async def state_update_legacy(req: StateUpdateRequest):
-    """프론트 JS가 /api/state-update-llm 으로 호출하던 버전을 위한 호환 엔드포인트."""
-    return await state_update(req)
 
 
 # -------------------------------------------------------------------------

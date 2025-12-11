@@ -42,7 +42,7 @@
         <div style="font-weight:500;margin-bottom:4px;font-size:0.82rem;">힌트</div>
         <ul style="margin:0;padding-left:16px;font-size:0.78rem;">
           <li>메인 모델: <code>gemini-3-pro-preview</code></li>
-          <li>보조 모델: <code>gemini-2.5-flash</code></li>
+          <li>현재는 메인 모델만 사용합니다.</li>
         </ul>
       </div>
     </div>
@@ -133,7 +133,6 @@
             </div>
             <div class="prompt-popover-tabs">
               <button class="prompt-tab-btn active" data-ptab="main">메인</button>
-              <button class="prompt-tab-btn" data-ptab="sub">보조</button>
               <button class="prompt-tab-btn" data-ptab="engine">엔진</button>
               <button class="prompt-tab-btn" data-ptab="lore">로스터</button>
             </div>
@@ -141,11 +140,6 @@
               <div class="prompt-mini-label">메인 프롬프트</div>
               <div class="prompt-mini-note">메인 LLM(GM 해설)의 시스템 프롬프트입니다.</div>
               <textarea id="mainPromptTextarea" placeholder="메인 시스템 프롬프트를 입력하세요."></textarea>
-            </div>
-            <div class="prompt-tab-content" data-ptab-content="sub">
-              <div class="prompt-mini-label">보조 프롬프트</div>
-              <div class="prompt-mini-note">STATE_UPDATE(캐시/상태 생성)용 보조 프롬프트입니다.</div>
-              <textarea id="subPromptTextarea" placeholder="보조 프롬프트를 입력하세요."></textarea>
             </div>
             <div class="prompt-tab-content" data-ptab-content="engine">
               <div class="prompt-mini-label">매치 엔진 (Python)</div>

@@ -442,22 +442,6 @@ def _update_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]
                     continue
 
 
-def apply_state_update(update: Dict[str, Any]) -> None:
-    """보조 LLM이 만든 STATE_UPDATE JSON을 GAME_STATE에 병합."""
-    if not isinstance(update, dict):
-        return
-
-    if "schema_version" in update:
-        GAME_STATE["schema_version"] = update["schema_version"]
-
-    for key in ("games", "teams", "players", "transactions"):
-        if key in update and update[key] is not None:
-            GAME_STATE[key] = update[key]
-
-    if "cached_views" in update and update["cached_views"] is not None:
-        GAME_STATE["cached_views"] = update["cached_views"]
-
-
 def get_schedule_summary() -> Dict[str, Any]:
     """마스터 스케줄 통계 요약을 반환한다.
 
