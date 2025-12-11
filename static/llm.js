@@ -319,3 +319,4 @@ async function loadRosterForTeam(teamId) {
     console.warn('로스터 요약 불러오기 오류:', e);
   }
 }
+
