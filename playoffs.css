@@ -1,0 +1,690 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Noto Sans KR", sans-serif;
+  background: #f5f5f7;
+  color: #111;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 공통 헤더 스타일 */
+
+.top-bar {
+  background: linear-gradient(90deg, #c8102e, #000);
+  color: #fff;
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.nba-logo {
+  background: #fff;
+  color: #c8102e;
+  font-weight: 900;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.gm-tag {
+  font-size: 13px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.top-bar-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-tab {
+  border: none;
+  background: transparent;
+  color: #f0f0f0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  opacity: 0.7;
+  transition: background 0.2s, opacity 0.2s, transform 0.1s;
+}
+
+.nav-tab:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.nav-tab.active {
+  opacity: 1;
+  background: #fff;
+  color: #c8102e;
+  font-weight: 600;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.pill-strong {
+  background: #fff;
+  color: #111;
+  font-weight: 600;
+}
+
+/* 화면 공통 */
+
+.screen {
+  display: none;
+  flex: 1;
+  padding: 24px 32px 40px;
+}
+
+.screen.active {
+  display: block;
+}
+
+.content-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+}
+
+.card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px 28px;
+  box-shadow: 0 10px 30px rgba(15, 15, 20, 0.07);
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+.muted {
+  color: #777;
+  font-size: 13px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: #f3f3f6;
+  color: #555;
+}
+
+.tag + .tag {
+  margin-left: 8px;
+}
+
+.tag-primary {
+  background: rgba(200, 16, 46, 0.08);
+  color: #c8102e;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.btn {
+  border-radius: 999px;
+  padding: 9px 18px;
+  border: 1px solid #d0d0d4;
+  background: #fff;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s,
+    border-color 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  background: #f8f8fb;
+  transform: translateY(-0.5px);
+  box-shadow: 0 4px 12px rgba(15, 15, 20, 0.08);
+  border-color: #c8102e33;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #c8102e;
+  border-color: #c8102e;
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #e01e3c;
+  border-color: #e01e3c;
+}
+
+.btn-secondary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #222;
+  border-color: #222;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #444;
+}
+
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: none;
+}
+
+.label {
+  font-size: 13px;
+  color: #666;
+}
+
+.spacer {
+  height: 20px;
+}
+
+/* 시즌/텍스트 공통 타이틀 (플레이오프에서 재활용) */
+
+.season-actions-title {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.season-actions-desc {
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: #555;
+}
+
+/* 플레이오프 화면 */
+
+.po-screen-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.po-screen-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.po-screen-sub {
+  font-size: 13px;
+  color: #666;
+}
+
+/* 플레이오프 탭 컨텐츠 */
+
+.po-tabs-container {
+  margin-top: 4px;
+}
+
+.po-tab {
+  display: none;
+}
+
+.po-tab.active {
+  display: block;
+}
+
+/* Home 탭 */
+
+.po-home-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.po-series-card {
+  padding: 26px 30px 28px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+}
+
+.po-series-round-label {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #777;
+  margin-bottom: 8px;
+}
+
+.po-series-matchup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 26px;
+  margin-bottom: 4px;
+}
+
+.po-team-block {
+  flex: 1;
+  text-align: center;
+}
+
+.po-team-name {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.po-team-name span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #777;
+  margin-left: 6px;
+}
+
+.po-team-record {
+  font-size: 24px;
+  margin-top: 4px;
+  color: #c8102e;
+  font-weight: 600;
+}
+
+.po-team-user .po-team-name {
+  color: #111;
+}
+
+.po-team-opponent .po-team-name {
+  color: #111;
+}
+
+.po-vs {
+  font-size: 22px;
+  font-weight: 700;
+  color: #555;
+  min-width: 36px;
+  text-align: center;
+}
+
+.po-series-meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #bbb;
+}
+
+.po-series-chips {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.po-series-chip {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f3f6;
+  color: #555;
+}
+
+.po-series-chip-highlight {
+  background: rgba(200, 16, 46, 0.08);
+  color: #c8102e;
+  font-weight: 600;
+}
+
+.po-home-actions-card {
+  padding: 18px 22px 20px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.po-home-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.po-home-actions-row .btn {
+  flex: 1 0 160px;
+  justify-content: center;
+}
+
+.po-note {
+  font-size: 12px;
+  color: #777;
+  margin-top: 6px;
+}
+
+/* Bracket 탭 */
+
+.po-bracket-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.po-bracket-column {
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px 18px 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.po-bracket-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.po-bracket-title-row h3 {
+  font-size: 16px;
+}
+
+.po-bracket-rounds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.po-bracket-round {
+  background: #fafafc;
+  border-radius: 14px;
+  padding: 10px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.po-round-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.po-series-mini {
+  background: #fff;
+  border-radius: 10px;
+  padding: 7px 7px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.po-series-mini + .po-series-mini {
+  margin-top: 6px;
+}
+
+.po-series-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.po-series-line + .po-series-line {
+  margin-top: 2px;
+}
+
+.seed {
+  width: 18px;
+  font-weight: 600;
+  color: #999;
+}
+
+.team-code {
+  flex: 1;
+  font-weight: 500;
+}
+
+.record {
+  width: 16px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.series-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #c8102e;
+  margin-top: 3px;
+}
+
+/* Stats 탭 */
+
+.stats-card {
+  padding: 18px 20px 22px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.stats-card h3 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.stats-card .muted {
+  margin-bottom: 10px;
+}
+
+.stats-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.stats-controls .btn {
+  font-size: 12px;
+  padding: 5px 11px;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 7px 6px;
+  text-align: right;
+  border-bottom: 1px solid #f0f0f2;
+}
+
+.stats-table th:first-child,
+.stats-table td:first-child {
+  text-align: left;
+  width: 26px;
+}
+
+.stats-table th:nth-child(2),
+.stats-table td:nth-child(2) {
+  text-align: left;
+}
+
+.stats-table thead {
+  background: #fafafc;
+}
+
+.stats-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #777;
+}
+
+.stats-player-name {
+  font-weight: 500;
+}
+
+.stats-team-tag {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.stat-highlight {
+  font-weight: 600;
+  color: #c8102e;
+}
+
+/* News 탭 */
+
+.news-card {
+  padding: 18px 20px 22px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.news-item {
+  padding: 10px 8px;
+  border-radius: 12px;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.news-item:hover {
+  background: #fafafc;
+  transform: translateY(-1px);
+}
+
+.news-headline {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.news-meta {
+  font-size: 11px;
+  color: #777;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.news-body {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.45;
+}
+
+.news-divider {
+  height: 1px;
+  background: #f0f0f2;
+  margin: 8px 0;
+}
+
+/* 반응형 */
+
+@media (max-width: 900px) {
+  .top-bar {
+    padding: 0 16px;
+  }
+
+  .top-bar-center {
+    display: none;
+  }
+
+  .screen {
+    padding: 18px 16px 30px;
+  }
+
+  .po-series-matchup-row {
+    flex-direction: column;
+  }
+
+  .po-team-block {
+    width: 100%;
+  }
+
+  .po-team-name {
+    font-size: 26px;
+  }
+
+  .po-team-record {
+    font-size: 20px;
+  }
+
+  .po-bracket-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .po-bracket-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

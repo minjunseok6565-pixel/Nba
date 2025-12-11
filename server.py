@@ -19,6 +19,14 @@ from state import (
     get_schedule_summary,
 )
 from league_sim import simulate_single_game, advance_league_until
+from playoffs import (
+    auto_advance_current_round,
+    advance_my_team_one_game,
+    build_postseason_field,
+    initialize_postseason,
+    play_my_team_play_in_game,
+    reset_postseason_state,
+)
 from news_ai import refresh_weekly_news
 from stats_util import compute_league_leaders
 from team_utils import (
@@ -83,6 +91,14 @@ class ChatMainRequest(BaseModel):
 class AdvanceLeagueRequest(BaseModel):
     target_date: str  # YYYY-MM-DD, 이 날짜까지 리그를 자동 진행
     user_team_id: Optional[str] = None
+
+
+class PostseasonSetupRequest(BaseModel):
+    my_team_id: str
+
+
+class EmptyRequest(BaseModel):
+    pass
 
 
 class WeeklyNewsRequest(BaseModel):
@@ -196,6 +212,58 @@ async def api_team_detail(team_id: str):
         return get_team_detail(team_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# 플레이-인 / 플레이오프
+# -------------------------------------------------------------------------
+
+
+@app.get("/api/postseason/field")
+async def api_postseason_field():
+    return build_postseason_field()
+
+
+@app.get("/api/postseason/state")
+async def api_postseason_state():
+    return GAME_STATE.get("postseason") or {}
+
+
+@app.post("/api/postseason/reset")
+async def api_postseason_reset():
+    return reset_postseason_state()
+
+
+@app.post("/api/postseason/setup")
+async def api_postseason_setup(req: PostseasonSetupRequest):
+    try:
+        return initialize_postseason(req.my_team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/postseason/play-in/my-team-game")
+async def api_play_in_my_team_game(req: EmptyRequest):
+    try:
+        return play_my_team_play_in_game()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/postseason/playoffs/advance-my-team-game")
+async def api_playoffs_advance_my_team_game(req: EmptyRequest):
+    try:
+        return advance_my_team_one_game()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/postseason/playoffs/auto-advance-round")
+async def api_playoffs_auto_advance_round(req: EmptyRequest):
+    try:
+        return auto_advance_current_round()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # -------------------------------------------------------------------------
