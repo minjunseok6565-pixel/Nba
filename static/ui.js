@@ -11,6 +11,7 @@ const apiSuccess = document.getElementById('apiSuccess');
 const teamGrid = document.getElementById('teamGrid');
 const btnTeamContinue = document.getElementById('btnTeamContinue');
 const currentTeamLabel = document.getElementById('currentTeamLabel');
+const chosenTeamLabel = document.getElementById('chosenTeamLabel');
 
 const navTabs = document.querySelectorAll('.nav-tab');
 const tabScreens = {
@@ -167,6 +168,9 @@ function selectTeam(teamId) {
 
   appState.selectedTeam = team;
   currentTeamLabel.textContent = `선택된 팀: ${team.name}`;
+    if (chosenTeamLabel) {
+    chosenTeamLabel.textContent = team.name;
+  }
   btnTeamContinue.disabled = false;
 
   // 팀을 선택하면 초기 시즌 스케줄 / 상태를 비워두거나 재설정할 수도 있음
@@ -1174,5 +1178,6 @@ function renderSidebarRecentGames() {
 
 
 // 초기화
+
 renderTeamCards();
 showScreen('apiKey');
