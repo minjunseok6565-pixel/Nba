@@ -7,7 +7,6 @@
 </head>
 <body>
   <div class="app">
-    <!-- 단일 상단바: 플레이오프 모드 전용 -->
     <header class="top-bar">
       <div class="top-bar-left">
         <div class="nba-logo">NBA</div>
@@ -19,315 +18,69 @@
         <button class="nav-tab po-nav-tab" data-po-tab="stats">Stats</button>
         <button class="nav-tab po-nav-tab" data-po-tab="news">News</button>
       </div>
-      <div class="top-bar-right">
-        <div class="pill">
-          시리즈: <strong>&nbsp;1R vs LAL</strong>
-        </div>
-        <div class="pill">
-          현재 스코어: <strong>&nbsp;3–1 리드</strong>
-        </div>
-        <div class="pill pill-strong">다음 경기: G5 · 홈</div>
+      <div class="top-bar-right" id="poTopBarMeta">
+        <div class="pill">시리즈 정보가 준비되면 여기에 표시됩니다</div>
       </div>
     </header>
 
-    <!-- 플레이오프 화면만 사용 -->
     <section id="screen-playoffs" class="screen active">
       <div class="content-shell">
         <div class="po-screen-title-row">
           <div>
-            <div class="po-screen-title">플레이오프 · 1라운드</div>
-            <div class="po-screen-sub">
-              SAC(3) vs LAL(6) · 7전 4선승제 · 현재 3–1 리드
+            <div class="po-screen-title" id="poScreenTitle">플레이오프</div>
+            <div class="po-screen-sub" id="poScreenSub">
+              아직 시리즈가 시작되지 않았습니다.
             </div>
           </div>
           <div class="po-screen-sub">
             <span class="label">모드:</span>
-            <strong>플레이오프 전용 스탯 활성화</strong>
+            <strong>플레이오프 전용 화면</strong>
           </div>
         </div>
 
         <div class="po-tabs-container">
-          <!-- Home 탭 -->
           <section id="po-tab-home" class="po-tab active">
             <div class="po-home-layout">
-              <div class="po-series-card">
-                <div class="po-series-round-label" id="poSeriesRoundLabel">
-                  Western Conference · 1st Round (Game 5)
-                </div>
-                <div class="po-series-matchup-row">
-                  <div class="po-team-block po-team-user">
-                    <div class="po-team-name" id="poUserTeamName">
-                      Sacramento Kings <span>(3)</span>
-                    </div>
-                    <div class="po-team-record" id="poUserSeriesRecord">3–1</div>
-                  </div>
-                  <div class="po-vs">vs</div>
-                  <div class="po-team-block po-team-opponent">
-                    <div class="po-team-name" id="poOppTeamName">
-                      Los Angeles Lakers <span>(6)</span>
-                    </div>
-                    <div class="po-team-record" id="poOppSeriesRecord">1–3</div>
-                  </div>
-                </div>
-                <div class="po-series-meta">
-                  <span id="poSeriesFormat">Best of 7</span>
-                  <span class="dot"></span>
-                  <span id="poNextGameInfo">G5 · Golden 1 Center · 2026-04-24</span>
-                  <span class="dot"></span>
-                  <span id="poTipoffTime">Tip-off 19:30</span>
-                </div>
-                <div class="po-series-chips">
-                  <span class="po-series-chip po-series-chip-highlight">
-                    최근 2경기 연속 승리
-                  </span>
-                  <span class="po-series-chip">LAL, 인사이드 득점 비중 54%</span>
-                  <span class="po-series-chip">Fox: 시리즈 평균 27.5점</span>
-                </div>
+              <div class="po-series-card" id="poSeriesCard">
+                <div class="po-series-round-label" id="poSeriesRoundLabel">시리즈 정보 없음</div>
+                <div class="po-series-matchup-row" id="poSeriesMatchup"></div>
+                <div class="po-series-meta" id="poSeriesMeta"></div>
+                <div class="po-series-chips" id="poSeriesChips"></div>
               </div>
 
               <div class="po-home-actions-card">
-                <div class="season-actions-title">G5 준비하기</div>
+                <div class="season-actions-title">플레이오프 관리</div>
                 <div class="season-actions-desc">
-                  상대 팀의 수비 매치업과 로테이션을 고려해 맞춤 전술을 설정하고,
-                  경기를 시뮬레이션하세요. 게임 진행 후에는 시리즈 스탯과 뉴스가 자동으로 업데이트됩니다.
+                  시리즈 데이터가 연결되면 맞춤 전술, 경기 시뮬레이션, 상대 정보 등을
+                  여기에서 바로 실행할 수 있습니다.
                 </div>
 
                 <div class="po-home-actions-row">
-                  <button id="poBtnTactics" class="btn">
-                    🎯 상대 맞춤 전술
-                  </button>
-                  <button id="poBtnPlayGame" class="btn btn-primary">
-                    ▶ 게임 진행
-                  </button>
-                  <button id="poBtnOppInfo" class="btn">
-                    🔍 상대 정보
-                  </button>
+                  <button id="poBtnTactics" class="btn" disabled>🎯 상대 맞춤 전술</button>
+                  <button id="poBtnPlayGame" class="btn btn-primary" disabled>▶ 게임 진행</button>
+                  <button id="poBtnOppInfo" class="btn" disabled>🔍 상대 정보</button>
                 </div>
                 <p class="po-note">
-                  * 이 화면은 디자인용 목업입니다. 실제 시뮬레이션 로직은 연결되어 있지 않습니다.
+                  필요한 데이터가 로드되면 버튼이 자동으로 활성화됩니다.
                 </p>
               </div>
             </div>
           </section>
 
-          <!-- Bracket 탭 -->
           <section id="po-tab-bracket" class="po-tab">
-            <div class="po-bracket-grid">
-              <!-- EAST -->
-              <div class="po-bracket-column">
-                <div class="po-bracket-title-row">
-                  <h3>Eastern Conference</h3>
-                  <span class="label">상위 시드: BOS (1)</span>
-                </div>
-                <div class="po-bracket-rounds">
-                  <!-- Round 1 -->
-                  <div class="po-bracket-round">
-                    <div class="po-round-title">1R</div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">1</span>
-                        <span class="team-code">BOS</span>
-                        <span class="record">4</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">8</span>
-                        <span class="team-code">ATL</span>
-                        <span class="record">1</span>
-                      </div>
-                      <div class="series-status">Series Won 4–1</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">4</span>
-                        <span class="team-code">CLE</span>
-                        <span class="record">3</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">5</span>
-                        <span class="team-code">NYK</span>
-                        <span class="record">3</span>
-                      </div>
-                      <div class="series-status">Tied 3–3</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">3</span>
-                        <span class="team-code">MIL</span>
-                        <span class="record">4</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">6</span>
-                        <span class="team-code">MIA</span>
-                        <span class="record">2</span>
-                      </div>
-                      <div class="series-status">Series Won 4–2</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">2</span>
-                        <span class="team-code">PHI</span>
-                        <span class="record">2</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">7</span>
-                        <span class="team-code">CHI</span>
-                        <span class="record">3</span>
-                      </div>
-                      <div class="series-status">CHI leads 3–2</div>
-                    </div>
-                  </div>
-
-                  <!-- Semis -->
-                  <div class="po-bracket-round">
-                    <div class="po-round-title">Semis</div>
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">1</span>
-                        <span class="team-code">BOS</span>
-                        <span class="record">1</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">4</span>
-                        <span class="team-code">CLE/NYK</span>
-                        <span class="record">1</span>
-                      </div>
-                      <div class="series-status">Tied 1–1</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">3</span>
-                        <span class="team-code">MIL</span>
-                        <span class="record">0</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">7</span>
-                        <span class="team-code">CHI/PHI</span>
-                        <span class="record">0</span>
-                      </div>
-                      <div class="series-status">Not Started</div>
-                    </div>
-                  </div>
-
-                  <!-- Finals -->
-                  <div class="po-bracket-round">
-                    <div class="po-round-title">Finals</div>
-                    <div class="muted" style="font-size:12px;">
-                      컨퍼런스 파이널 매치업은 아직 확정되지 않았습니다.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- WEST -->
-              <div class="po-bracket-column">
-                <div class="po-bracket-title-row">
-                  <h3>Western Conference</h3>
-                  <span class="label">상위 시드: DEN (1)</span>
-                </div>
-                <div class="po-bracket-rounds">
-                  <!-- Round 1 -->
-                  <div class="po-bracket-round">
-                    <div class="po-round-title">1R</div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">1</span>
-                        <span class="team-code">DEN</span>
-                        <span class="record">4</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">8</span>
-                        <span class="team-code">NOP</span>
-                        <span class="record">1</span>
-                      </div>
-                      <div class="series-status">Series Won 4–1</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">4</span>
-                        <span class="team-code">PHX</span>
-                        <span class="record">2</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">5</span>
-                        <span class="team-code">MIN</span>
-                        <span class="record">3</span>
-                      </div>
-                      <div class="series-status">MIN leads 3–2</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">3</span>
-                        <span class="team-code">SAC</span>
-                        <span class="record">3</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">6</span>
-                        <span class="team-code">LAL</span>
-                        <span class="record">1</span>
-                      </div>
-                      <div class="series-status">SAC leads 3–1</div>
-                    </div>
-
-                    <div class="po-series-mini">
-                      <div class="po-series-line">
-                        <span class="seed">2</span>
-                        <span class="team-code">OKC</span>
-                        <span class="record">2</span>
-                      </div>
-                      <div class="po-series-line">
-                        <span class="seed">7</span>
-                        <span class="team-code">GSW</span>
-                        <span class="record">2</span>
-                      </div>
-                      <div class="series-status">Tied 2–2</div>
-                    </div>
-                  </div>
-
-                  <!-- Semis -->
-                  <div class="po-bracket-round">
-                    <div class="po-round-title">Semis</div>
-                    <div class="muted" style="font-size:12px;">
-                      일부 시리즈가 아직 종료되지 않았습니다.
-                    </div>
-                  </div>
-
-                  <!-- Finals -->
-                  <div class="po-bracket-round">
-                    <div class="po-round-title">Finals</div>
-                    <div class="muted" style="font-size:12px;">
-                      서부 컨퍼런스 파이널 진출 팀 대기 중.
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div class="po-bracket-grid" id="poBracketGrid">
+              <div class="empty-state">브라켓 정보가 아직 없습니다.</div>
             </div>
           </section>
 
-          <!-- Stats 탭 -->
           <section id="po-tab-stats" class="po-tab">
             <div class="stats-card">
               <h3>Playoffs Stats Leaders</h3>
-              <p class="muted">
-                정규 시즌 스탯은 초기화되고, 플레이오프 경기 기록만 반영됩니다.
-              </p>
+              <p class="muted">플레이오프 경기 기록이 수집되면 자동으로 집계됩니다.</p>
 
-              <div class="stats-controls">
-                <button class="btn btn-ghost">PTS</button>
-                <button class="btn btn-ghost">REB</button>
-                <button class="btn btn-ghost">AST</button>
-                <button class="btn btn-ghost">3P%</button>
-                <button class="btn btn-ghost">PER</button>
-              </div>
+              <div class="stats-controls" id="poStatsFilters"></div>
 
-              <table class="stats-table">
+              <table class="stats-table" aria-label="Playoff stats table">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -341,138 +94,23 @@
                     <th>FG%</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <td>1</td>
-                    <td class="stats-player-name">
-                      De'Aaron Fox
-                      <span class="stats-team-tag">SAC · G</span>
-                    </td>
-                    <td>SAC</td>
-                    <td>4</td>
-                    <td>37.5</td>
-                    <td class="stat-highlight">27.5</td>
-                    <td>4.2</td>
-                    <td>7.1</td>
-                    <td>48.9</td>
-                  </tr>
-                  <tr>
-                    <td>2</td>
-                    <td class="stats-player-name">
-                      LeBron James
-                      <span class="stats-team-tag">LAL · F</span>
-                    </td>
-                    <td>LAL</td>
-                    <td>4</td>
-                    <td>36.1</td>
-                    <td>26.3</td>
-                    <td>8.0</td>
-                    <td>8.5</td>
-                    <td>51.2</td>
-                  </tr>
-                  <tr>
-                    <td>3</td>
-                    <td class="stats-player-name">
-                      Domantas Sabonis
-                      <span class="stats-team-tag">SAC · C</span>
-                    </td>
-                    <td>SAC</td>
-                    <td>4</td>
-                    <td>34.8</td>
-                    <td>20.2</td>
-                    <td class="stat-highlight">14.1</td>
-                    <td>6.0</td>
-                    <td>58.4</td>
-                  </tr>
-                  <tr>
-                    <td>4</td>
-                    <td class="stats-player-name">
-                      Nikola Jokić
-                      <span class="stats-team-tag">DEN · C</span>
-                    </td>
-                    <td>5</td>
-                    <td>33.9</td>
-                    <td>25.8</td>
-                    <td>12.3</td>
-                    <td>9.0</td>
-                    <td>61.0</td>
-                  </tr>
-                  <tr>
-                    <td>5</td>
-                    <td class="stats-player-name">
-                      Anthony Edwards
-                      <span class="stats-team-tag">MIN · G</span>
-                    </td>
-                    <td>5</td>
-                    <td>35.6</td>
-                    <td class="stat-highlight">28.1</td>
-                    <td>5.3</td>
-                    <td>4.4</td>
-                    <td>47.2</td>
+                <tbody id="poStatsTableBody">
+                  <tr class="empty-state-row">
+                    <td colspan="9">플레이오프 스탯이 없습니다.</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </section>
 
-          <!-- News 탭 -->
           <section id="po-tab-news" class="po-tab">
             <div class="news-card">
               <h3>Playoffs News Center</h3>
               <p class="muted">
-                플레이오프 경기 결과와 시리즈 흐름에 따라 자동으로 뉴스가 생성되는 영역입니다.
+                경기 결과, 브라켓 변동, 팀 리포트가 연결되면 자동으로 표시됩니다.
               </p>
-
-              <div class="news-item">
-                <div class="news-headline">
-                  “Light the Beam” 다시 켜질까, 킹스 3–1 리드 확보
-                </div>
-                <div class="news-meta">
-                  <span>서부 1R · G4 종료</span>
-                  <span>·</span>
-                  <span>SAC 114 – 107 LAL</span>
-                </div>
-                <div class="news-body">
-                  폭발적인 3쿼터 러닝 게임으로 흐름을 가져온 킹스가 시리즈 전적 3–1을
-                  만들며 2라운드 진출까지 단 한 경기만을 남겨두게 되었다. Fox와 Sabonis가
-                  동시에 20+ 득점을 기록했고, 벤치 라인업 또한 LAL 벤치를 26–14로 압도했다.
-                </div>
-              </div>
-
-              <div class="news-divider"></div>
-
-              <div class="news-item">
-                <div class="news-headline">
-                  Lakers, G5에서 수비 로테이션 전면 수정 예고
-                </div>
-                <div class="news-meta">
-                  <span>소스: 가상 Beat Writer</span>
-                  <span>·</span>
-                  <span>전술 리포트</span>
-                </div>
-                <div class="news-body">
-                  다니엘스 감독은 “Fox의 드리블 돌파를 제어하기 위해 더 많은 길이와
-                  사이즈를 투입하겠다”고 언급했다. LAL은 G5에서 더블팀 타이밍과
-                  매치업 체인지 빈도를 크게 늘릴 계획으로 알려졌다.
-                </div>
-              </div>
-
-              <div class="news-divider"></div>
-
-              <div class="news-item">
-                <div class="news-headline">
-                  서부 브라켓 업데이트: DEN, 2라운드 선착
-                </div>
-                <div class="news-meta">
-                  <span>리그 전체</span>
-                  <span>·</span>
-                  <span>브라켓 리포트</span>
-                </div>
-                <div class="news-body">
-                  1번 시드 덴버는 NOP를 상대로 4–1 시리즈 승리를 거두며 서부 세미파이널에
-                  선착했다. 반대 브라켓에서는 MIN이 PHX를 상대로 시리즈 리드를 잡으며
-                  잠재적인 2라운드 매치업이 점점 윤곽을 드러내고 있다.
-                </div>
+              <div id="poNewsFeed">
+                <div class="empty-state">뉴스가 아직 없습니다.</div>
               </div>
             </div>
           </section>
@@ -482,7 +120,6 @@
   </div>
 
   <script>
-    // 플레이오프 탭 전환
     const poNavTabs = document.querySelectorAll(".po-nav-tab");
     const poTabs = {
       home: document.getElementById("po-tab-home"),
@@ -494,29 +131,416 @@
     poNavTabs.forEach((btn) => {
       btn.addEventListener("click", () => {
         const tab = btn.dataset.poTab;
-
         poNavTabs.forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-
-        Object.values(poTabs).forEach((el) =>
-          el.classList.remove("active")
-        );
+        Object.values(poTabs).forEach((el) => el.classList.remove("active"));
         if (poTabs[tab]) {
           poTabs[tab].classList.add("active");
         }
       });
     });
 
-    // 플레이오프 버튼 목업 알림
-    document.getElementById("poBtnTactics").addEventListener("click", () => {
-      alert("상대 맞춤 전술 화면은 추후 구현 예정입니다. (현재는 디자인 목업)");
-    });
-    document.getElementById("poBtnPlayGame").addEventListener("click", () => {
-      alert("게임 진행 시뮬레이션은 추후 엔진과 연동할 수 있습니다. (현재는 디자인 목업)");
-    });
-    document.getElementById("poBtnOppInfo").addEventListener("click", () => {
-      alert("상대 정보(로스터/전술)는 추후 구현 예정입니다. (현재는 디자인 목업)");
-    });
+    function renderTopBar(meta = []) {
+      const container = document.getElementById("poTopBarMeta");
+      container.innerHTML = "";
+      if (!meta.length) {
+        container.innerHTML = '<div class="pill">시리즈 정보가 준비되면 여기에 표시됩니다</div>';
+        return;
+      }
+      meta.forEach((item) => {
+        const pill = document.createElement("div");
+        pill.className = "pill" + (item.strong ? " pill-strong" : "");
+        pill.innerHTML = `${item.label}: <strong>&nbsp;${item.value}</strong>`;
+        container.appendChild(pill);
+      });
+    }
+
+    function renderSeriesCard(series, roundName = "") {
+      const roundLabelEl = document.getElementById("poSeriesRoundLabel");
+      const matchupRow = document.getElementById("poSeriesMatchup");
+      const meta = document.getElementById("poSeriesMeta");
+      const chips = document.getElementById("poSeriesChips");
+      const title = document.getElementById("poScreenTitle");
+      const sub = document.getElementById("poScreenSub");
+
+      if (!series) {
+        roundLabelEl.textContent = "시리즈 정보 없음";
+        matchupRow.innerHTML = '<div class="empty-state">시리즈 매치업이 없습니다.</div>';
+        meta.textContent = "";
+        chips.innerHTML = "";
+        title.textContent = "플레이오프";
+        sub.textContent = "아직 시리즈가 시작되지 않았습니다.";
+        return;
+      }
+
+      const homeId = series.home_court;
+      const roadId = series.road;
+      const wins = series.wins || {};
+      const bestOf = series.best_of || 7;
+      const gamesPlayed = (series.games || []).length;
+      const homeSeed = series.home_entry?.seed ?? "-";
+      const roadSeed = series.road_entry?.seed ?? "-";
+      const homeLabel = series.home_entry?.team_id || homeId || "Home Team";
+      const roadLabel = series.road_entry?.team_id || roadId || "Away Team";
+
+      roundLabelEl.textContent = roundName || series.round || "시리즈";
+      title.textContent = `플레이오프 · ${roundName || series.round || "시리즈"}`;
+      sub.textContent = `${homeLabel} vs ${roadLabel}`;
+
+      matchupRow.innerHTML = "";
+      const userBlock = document.createElement("div");
+      userBlock.className = "po-team-block po-team-user";
+      userBlock.innerHTML = `
+        <div class="po-team-name">
+          ${homeLabel}
+          <span>(${homeSeed})</span>
+        </div>
+        <div class="po-team-record">${wins[homeId] ?? 0}승</div>
+      `;
+
+      const oppBlock = document.createElement("div");
+      oppBlock.className = "po-team-block po-team-opponent";
+      oppBlock.innerHTML = `
+        <div class="po-team-name">
+          ${roadLabel}
+          <span>(${roadSeed})</span>
+        </div>
+        <div class="po-team-record">${wins[roadId] ?? 0}승</div>
+      `;
+
+      const vs = document.createElement("div");
+      vs.className = "po-vs";
+      vs.textContent = "vs";
+
+      matchupRow.appendChild(userBlock);
+      matchupRow.appendChild(vs);
+      matchupRow.appendChild(oppBlock);
+
+      meta.innerHTML = "";
+      const metaItems = [
+        series.matchup ? `매치업: ${series.matchup}` : null,
+        bestOf ? `시리즈: ${bestOf}전 ${Math.floor(bestOf / 2) + 1}선승` : null,
+        gamesPlayed || gamesPlayed === 0 ? `진행 경기: ${gamesPlayed}` : null,
+      ].filter(Boolean);
+
+      metaItems.forEach((text, index) => {
+        const span = document.createElement("span");
+        span.textContent = text;
+        meta.appendChild(span);
+        if (index < metaItems.length - 1) {
+          const dot = document.createElement("span");
+          dot.className = "dot";
+          meta.appendChild(dot);
+        }
+      });
+
+      chips.innerHTML = "";
+      const winnerTeam = series.winner?.team_id || series.winner;
+      const statusChip = document.createElement("span");
+      statusChip.className = "po-series-chip";
+      statusChip.textContent = winnerTeam
+        ? `시리즈 종료 · 우승: ${winnerTeam}`
+        : "시리즈 진행 중";
+      chips.appendChild(statusChip);
+
+      const buttons = [
+        document.getElementById("poBtnTactics"),
+        document.getElementById("poBtnPlayGame"),
+        document.getElementById("poBtnOppInfo"),
+      ];
+      buttons.forEach((btn) => (btn.disabled = false));
+    }
+
+    function renderBracket(playoffs = null) {
+      const grid = document.getElementById("poBracketGrid");
+      grid.innerHTML = "";
+      if (!playoffs || !playoffs.bracket) {
+        grid.innerHTML = '<div class="empty-state">브라켓 정보가 아직 없습니다.</div>';
+        return;
+      }
+
+      const bracket = playoffs.bracket;
+      const conferences = [
+        { key: "east", title: "Eastern Conference" },
+        { key: "west", title: "Western Conference" },
+      ];
+
+      conferences.forEach((conf) => {
+        const column = document.createElement("div");
+        column.className = "po-bracket-column";
+        column.innerHTML = `
+          <div class="po-bracket-title-row">
+            <h3>${conf.title}</h3>
+            <span class="label">시리즈 진행 상황</span>
+          </div>
+        `;
+        const rounds = document.createElement("div");
+        rounds.className = "po-bracket-rounds";
+
+        const confBracket = bracket[conf.key] || {};
+        const roundDefs = [
+          { title: "1R", list: confBracket.quarterfinals || [] },
+          { title: "Semis", list: confBracket.semifinals || [] },
+          { title: "Finals", list: confBracket.finals ? [confBracket.finals] : [] },
+        ];
+
+        roundDefs.forEach((round) => {
+          const roundEl = document.createElement("div");
+          roundEl.className = "po-bracket-round";
+          roundEl.innerHTML = `<div class="po-round-title">${round.title}</div>`;
+
+          if (!round.list?.length) {
+            const placeholder = document.createElement("div");
+            placeholder.className = "muted";
+            placeholder.textContent = "매치업이 준비 중입니다.";
+            roundEl.appendChild(placeholder);
+          }
+
+          (round.list || []).forEach((series) => {
+            const seriesEl = document.createElement("div");
+            seriesEl.className = "po-series-mini";
+            const wins = series.wins || {};
+            const homeId = series.home_court;
+            const roadId = series.road;
+            const lines = [
+              {
+                seed: series.home_entry?.seed ?? "-",
+                team: series.home_entry?.team_id || homeId || "-",
+                record: wins[homeId] ?? 0,
+              },
+              {
+                seed: series.road_entry?.seed ?? "-",
+                team: series.road_entry?.team_id || roadId || "-",
+                record: wins[roadId] ?? 0,
+              },
+            ];
+
+            lines.forEach((line) => {
+              const lineEl = document.createElement("div");
+              lineEl.className = "po-series-line";
+              lineEl.innerHTML = `
+                <span class="seed">${line.seed ?? "-"}</span>
+                <span class="team-code">${line.team || "-"}</span>
+                <span class="record">${line.record ?? "-"}</span>
+              `;
+              seriesEl.appendChild(lineEl);
+            });
+            const status = document.createElement("div");
+            status.className = "series-status";
+            status.textContent = series.winner?.team_id
+              ? `종료 · ${series.winner.team_id}`
+              : "진행 중";
+            seriesEl.appendChild(status);
+            roundEl.appendChild(seriesEl);
+          });
+
+          rounds.appendChild(roundEl);
+        });
+
+        column.appendChild(rounds);
+        grid.appendChild(column);
+      });
+
+      if (bracket.finals) {
+        const finalsCol = document.createElement("div");
+        finalsCol.className = "po-bracket-column";
+        finalsCol.innerHTML = `
+          <div class="po-bracket-title-row">
+            <h3>NBA Finals</h3>
+            <span class="label">최종 라운드</span>
+          </div>
+        `;
+        const rounds = document.createElement("div");
+        rounds.className = "po-bracket-rounds";
+
+        const roundEl = document.createElement("div");
+        roundEl.className = "po-bracket-round";
+        roundEl.innerHTML = `<div class="po-round-title">Finals</div>`;
+
+        const series = bracket.finals;
+        if (series) {
+          const seriesEl = document.createElement("div");
+          seriesEl.className = "po-series-mini";
+          const wins = series.wins || {};
+          const homeId = series.home_court;
+          const roadId = series.road;
+          const lines = [
+            {
+              seed: series.home_entry?.seed ?? "-",
+              team: series.home_entry?.team_id || homeId || "-",
+              record: wins[homeId] ?? 0,
+            },
+            {
+              seed: series.road_entry?.seed ?? "-",
+              team: series.road_entry?.team_id || roadId || "-",
+              record: wins[roadId] ?? 0,
+            },
+          ];
+
+          lines.forEach((line) => {
+            const lineEl = document.createElement("div");
+            lineEl.className = "po-series-line";
+            lineEl.innerHTML = `
+              <span class="seed">${line.seed ?? "-"}</span>
+              <span class="team-code">${line.team || "-"}</span>
+              <span class="record">${line.record ?? "-"}</span>
+            `;
+            seriesEl.appendChild(lineEl);
+          });
+          const status = document.createElement("div");
+          status.className = "series-status";
+          status.textContent = series.winner?.team_id
+            ? `종료 · ${series.winner.team_id}`
+            : "진행 중";
+          seriesEl.appendChild(status);
+          roundEl.appendChild(seriesEl);
+        }
+
+        rounds.appendChild(roundEl);
+        finalsCol.appendChild(rounds);
+        grid.appendChild(finalsCol);
+      }
+    }
+
+    function renderStats(categories = [], stats = []) {
+      const filters = document.getElementById("poStatsFilters");
+      const tbody = document.getElementById("poStatsTableBody");
+      filters.innerHTML = "";
+
+      categories.forEach((cat, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "btn btn-ghost" + (idx === 0 ? " active" : "");
+        btn.textContent = cat;
+        filters.appendChild(btn);
+      });
+
+      tbody.innerHTML = "";
+      if (!stats.length) {
+        tbody.innerHTML = '<tr class="empty-state-row"><td colspan="9">플레이오프 스탯이 없습니다.</td></tr>';
+        return;
+      }
+
+      stats.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.rank}</td>
+          <td class="stats-player-name">${row.player} <span class="stats-team-tag">${row.team} · ${row.detail}</span></td>
+          <td>${row.team}</td>
+          <td>${row.games}</td>
+          <td>${row.minutes}</td>
+          <td class="stat-highlight">${row.points}</td>
+          <td>${row.rebounds}</td>
+          <td>${row.assists}</td>
+          <td>${row.fg}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function fetchJson(url, options = {}) {
+      try {
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        return await res.json();
+      } catch (err) {
+        console.error("플레이오프 데이터 요청 실패", err);
+        return null;
+      }
+    }
+
+    function findSeriesForTeam(playoffs, teamId) {
+      if (!playoffs || !teamId) return null;
+      const bracket = playoffs.bracket || {};
+      const roundName = playoffs.current_round || "Conference Quarterfinals";
+      const roundSeries = (function () {
+        if (roundName === "Conference Quarterfinals") {
+          return (bracket.east?.quarterfinals || []).concat(
+            bracket.west?.quarterfinals || []
+          );
+        }
+        if (roundName === "Conference Semifinals") {
+          return (bracket.east?.semifinals || []).concat(bracket.west?.semifinals || []);
+        }
+        if (roundName === "Conference Finals") {
+          return (bracket.east?.finals ? [bracket.east.finals] : []).concat(
+            bracket.west?.finals ? [bracket.west.finals] : []
+          );
+        }
+        if (roundName === "NBA Finals") {
+          return bracket.finals ? [bracket.finals] : [];
+        }
+        return [];
+      })();
+
+      return roundSeries.find(
+        (series) => series && [series.home_court, series.road].includes(teamId)
+      );
+    }
+
+    function buildTopBarMeta(playoffs, series, myTeamId) {
+      if (!playoffs || !series) return [];
+      const wins = series.wins || {};
+      const homeId = series.home_court;
+      const roadId = series.road;
+      const scoreLabel = `${wins[homeId] ?? 0}-${wins[roadId] ?? 0}`;
+      const pills = [
+        { label: "현재 라운드", value: playoffs.current_round || "-" },
+        { label: "시리즈", value: series.matchup || `${homeId || "-"} vs ${roadId || "-"}` },
+        { label: "현재 스코어", value: scoreLabel },
+      ];
+
+      if (myTeamId) {
+        pills.push({ label: "내 팀", value: myTeamId, strong: true });
+      }
+
+      if (series.winner?.team_id) {
+        pills.push({ label: "승자", value: series.winner.team_id, strong: true });
+      }
+
+      return pills;
+    }
+
+    function renderNews(news = []) {
+      const feed = document.getElementById("poNewsFeed");
+      feed.innerHTML = "";
+      if (!news.length) {
+        feed.innerHTML = '<div class="empty-state">뉴스가 아직 없습니다.</div>';
+        return;
+      }
+
+      news.forEach((item, index) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "news-item";
+        wrapper.innerHTML = `
+          <div class="news-headline">${item.headline}</div>
+          <div class="news-meta">${item.meta}</div>
+          <div class="news-body">${item.body}</div>
+        `;
+        feed.appendChild(wrapper);
+        if (index < news.length - 1) {
+          const divider = document.createElement("div");
+          divider.className = "news-divider";
+          feed.appendChild(divider);
+        }
+      });
+    }
+
+    async function loadPlayoffsScreen() {
+      const postseason = await fetchJson("/api/postseason/state");
+      const playoffs = postseason?.playoffs || null;
+      const myTeamId = postseason?.my_team_id || null;
+      const mySeries = findSeriesForTeam(playoffs, myTeamId) || null;
+
+      renderTopBar(buildTopBarMeta(playoffs, mySeries, myTeamId));
+      renderSeriesCard(mySeries, playoffs?.current_round || "");
+      renderBracket(playoffs);
+
+      // Stats/News endpoints are not wired yet; keep empty states until backend supplies them.
+      renderStats([], []);
+      renderNews([]);
+    }
+
+    loadPlayoffsScreen();
   </script>
 </body>
 </html>
