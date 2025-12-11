@@ -172,7 +172,14 @@ async def api_advance_league(req: AdvanceLeagueRequest):
 
 @app.get("/api/stats/leaders")
 async def api_stats_leaders():
-    return compute_league_leaders()
+    # The frontend expects a flat object with an uppercase stat key (e.g., PTS)
+    # under `data.leaders`. Some previous iterations of the API wrapped this
+    # structure under stats.leaderboards with lowercase keys, which caused the
+    # UI to break. Normalize here so the client always receives
+    # `{ leaders: { PTS: [...], AST: [...], ... }, updated_at: <iso date> }`.
+    leaders = compute_league_leaders()
+    current_date = GAME_STATE.get("current_date")
+    return {"leaders": leaders, "updated_at": current_date}
 
 
 @app.get("/api/standings")
@@ -203,7 +210,17 @@ async def api_news_week(req: WeeklyNewsRequest):
     if not req.apiKey:
         raise HTTPException(status_code=400, detail="apiKey is required")
     try:
-        return refresh_weekly_news(req.apiKey)
+        payload = refresh_weekly_news(req.apiKey)
+
+        # Some endpoints previously wrapped the news payload like
+        # `{ "news": { "current_date": ..., "items": [...] } }`, which the
+        # frontend does not expect. Normalize it back to the raw shape.
+        if isinstance(payload, dict) and "news" in payload and isinstance(
+            payload["news"], dict
+        ):
+            payload = payload["news"]
+
+        return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weekly news generation failed: {e}")
 
