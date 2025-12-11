@@ -30,7 +30,9 @@ def compute_league_leaders() -> Dict[str, List[Dict[str, Any]]]:
                     "name": entry.get("name"),
                     "team_id": entry.get("team_id"),
                     "games": games,
+                    "GP": games,
                     "per_game": per_game,
+                    stat_name: per_game,
                 }
             )
 
