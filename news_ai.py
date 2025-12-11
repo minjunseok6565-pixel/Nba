@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Dict, List
 
 import google.generativeai as genai
@@ -39,57 +39,32 @@ def _get_current_date() -> date:
         return date.today()
 
 
-def _week_start(d: date) -> date:
-    return d - timedelta(days=d.weekday())
-
-
-def build_week_summary_context() -> str:
+def build_recent_games_context(batch_size: int = 5) -> str:
     current_date = _get_current_date()
-    week_start = current_date - timedelta(days=6)
+
+    games_sorted = sorted(
+        GAME_STATE.get("games", []), key=lambda x: x.get("date") or ""
+    )
+    recent_games = games_sorted[-batch_size:]
 
     lines: List[str] = []
     lines.append(f"Current league date: {current_date.isoformat()}")
-    lines.append(f"Coverage window: {week_start.isoformat()} ~ {current_date.isoformat()}")
-
-    games = []
-    for g in GAME_STATE.get("games", []):
-        try:
-            g_date = date.fromisoformat(g.get("date"))
-        except Exception:
-            continue
-        if week_start <= g_date <= current_date:
-            games.append(g)
-
-    games_sorted = sorted(games, key=lambda x: x.get("date"))
-    lines.append("\n[Games]")
-    if not games_sorted:
-        lines.append("No games played in this window.")
+    if recent_games:
+        start_date = recent_games[0].get("date")
+        end_date = recent_games[-1].get("date")
+        lines.append(f"Coverage window: {start_date} ~ {end_date}")
     else:
-        for g in games_sorted:
+        lines.append("Coverage window: no games played yet")
+
+    lines.append("\n[Last 5 Games]")
+    if not recent_games:
+        lines.append("No games have been completed.")
+    else:
+        for g in recent_games:
             lines.append(
                 f"{g.get('date')}: {g.get('home_team_id')} {g.get('home_score')} - "
                 f"{g.get('away_team_id')} {g.get('away_score')}"
             )
-
-    transactions = []
-    for t in GAME_STATE.get("transactions", []):
-        t_date = t.get("date") or t.get("created_at")
-        if not t_date:
-            continue
-        try:
-            t_d = date.fromisoformat(str(t_date))
-        except Exception:
-            continue
-        if week_start <= t_d <= current_date:
-            transactions.append(t)
-
-    lines.append("\n[Transactions]")
-    if not transactions:
-        lines.append("No trades or transactions recorded.")
-    else:
-        for t in transactions:
-            summary = t.get("summary") or t.get("title") or str(t)
-            lines.append(f"{t.get('date', '')}: {summary}")
 
     standings = get_conference_standings()
     lines.append("\n[Top Teams]")
@@ -106,16 +81,16 @@ def build_week_summary_context() -> str:
     return "\n".join(lines)
 
 
-def generate_weekly_news(api_key: str) -> List[Dict[str, Any]]:
+def generate_weekly_news(api_key: str, batch_size: int = 5) -> List[Dict[str, Any]]:
     if not api_key:
         raise ValueError("apiKey is required")
 
-    context = build_week_summary_context()
+    context = build_recent_games_context(batch_size=batch_size)
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-3-pro-preview")
 
     prompt = (
-        "You are an NBA beat writer. Summarize the past week into 3-6 news articles. "
+        "You are an NBA beat writer. Summarize the last set of games into 3-6 news articles. "
         "Return ONLY a JSON array. Each item must have keys: "
         "title, summary, tags (array of strings), related_team_ids (array of team IDs), "
         "related_player_names (array of strings)."
@@ -159,14 +134,21 @@ def generate_weekly_news(api_key: str) -> List[Dict[str, Any]]:
 
 def refresh_weekly_news(api_key: str) -> Dict[str, Any]:
     current_date = _get_current_date()
-    week_key = _week_start(current_date).isoformat()
+    games_played = len(GAME_STATE.get("games", []))
     cache = GAME_STATE.setdefault("cached_views", {}).setdefault("weekly_news", {})
 
-    if cache.get("last_generated_week_start") == week_key and cache.get("items"):
+    last_generated_count = cache.get("last_generated_game_count") or 0
+    if games_played < 5 and not cache.get("items"):
+        return {"current_date": current_date.isoformat(), "items": []}
+
+    last_batch = last_generated_count // 5
+    current_batch = games_played // 5
+    if cache.get("items") and last_batch >= current_batch:
         return {"current_date": current_date.isoformat(), "items": cache.get("items", [])}
 
-    items = generate_weekly_news(api_key)
-    cache["last_generated_week_start"] = week_key
+    items = generate_weekly_news(api_key, batch_size=5)
+    cache["last_generated_week_start"] = None
+    cache["last_generated_game_count"] = games_played
     cache["items"] = items
 
     return {"current_date": current_date.isoformat(), "items": items}

@@ -37,6 +37,7 @@ GAME_STATE: Dict[str, Any] = {
         "weekly_news": {
             "last_generated_week_start": None,
             "items": [],
+            "last_generated_game_count": 0,
         },
     },
     "league": {

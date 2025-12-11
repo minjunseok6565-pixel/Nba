@@ -1119,7 +1119,7 @@ async function renderNews() {
 
   if (!items.length) {
     const empty = document.createElement('div');
-    empty.textContent = '최근 일주일 동안 생성된 뉴스가 없습니다.';
+    empty.textContent = '아직 생성된 뉴스가 없습니다. 5경기를 완료하면 첫 뉴스가 표시됩니다.';
     newsList.appendChild(empty);
     return;
   }
