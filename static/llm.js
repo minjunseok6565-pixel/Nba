@@ -1,7 +1,5 @@
 // LLM 관련 상태
 let isLLMLoading = false;
-let isSubLLMLoading = false;
-const subPromptTextarea = document.getElementById('subPromptTextarea');
 
 function setLLMLoadingStatus(kind, loading, message) {
   if (!llmStatus) return;
@@ -12,10 +10,7 @@ function setLLMLoadingStatus(kind, loading, message) {
       homeLLMOutput.textContent = llmStatus.textContent;
     }
   } else {
-    // 메인/서브 둘 다 끝났을 때만 비움
-    if (!isLLMLoading && !isSubLLMLoading) {
-      llmStatus.textContent = '';
-    }
+    llmStatus.textContent = '';
   }
 }
 
@@ -146,8 +141,6 @@ async function sendToMainLLM() {
     // 어시스턴트 응답도 히스토리에 추가
     appState.chatHistory.push({ role: 'assistant', text: answer });
 
-    // 이후, 원하면 여기서도 바로 STATE_UPDATE를 호출할 수 있다.
-    // (지금은 simulateGameProgress() 쪽에서 경기 후에 호출)
   } catch (err) {
     console.error('sendToMainLLM 오류:', err);
     alert('LLM 호출 중 오류가 발생했습니다.');
@@ -238,42 +231,6 @@ function formatSimulationSummary(simulatedGames) {
       return `${g.game_date} · ${matchup} (${outcome})`;
     })
     .join('\n');
-}
-
-// 보조 LLM: 경기 후 상태 업데이트 등에 사용
-async function callSubLLMStateUpdate(engineOutput) {
-  if (!appState.apiKey) return;
-
-  try {
-    isSubLLMLoading = true;
-    setLLMLoadingStatus('sub', true, '보조 LLM이 상태를 업데이트 중...');
-    const payload = {
-      apiKey: appState.apiKey,
-      subPrompt: (subPromptTextarea?.value || '').trim(),
-      engineOutput,
-      currentState: appState.cachedViews?.schedule || null,
-    };
-
-    const res = await fetch('/api/state-update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      console.warn('STATE_UPDATE API 에러:', await res.text());
-      return;
-    }
-
-    const data = await res.json();
-    console.log('STATE_UPDATE raw:', data.raw);
-    console.log('STATE_UPDATE parsed:', data.parsed);
-  } catch (e) {
-    console.warn('STATE_UPDATE 호출 중 오류:', e);
-  } finally {
-    isSubLLMLoading = false;
-    setLLMLoadingStatus('sub', false);
-  }
 }
 
 // 이벤트 바인딩: 메인 LLM 호출

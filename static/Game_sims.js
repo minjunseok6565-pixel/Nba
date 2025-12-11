@@ -357,11 +357,6 @@ async function simulateGameProgress() {
     if (cv.weeklyNews) cv.weeklyNews.lastLoaded = null;
     if (cv.teams) cv.teams.lastLoaded = null;
 
-    // 보조 LLM에 STATE_UPDATE 맡기기 (있으면)
-    if (appState.apiKey) {
-      callSubLLMStateUpdate(data);
-    }
-
     return {
       success: true,
       game_id: nextGame.game_id,
