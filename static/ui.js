@@ -33,6 +33,7 @@ const homeUserInput = document.getElementById('homeUserInput');
 const btnSendToLLM = document.getElementById('btnSendToLLM');
 const btnSimGame = document.getElementById('btnSimGame');
 const btnStartPostseason = document.getElementById('btnStartPostseason');
+const btnSkipToPostseason = document.getElementById('btnSkipToPostseason');
 const homeLLMOutput = document.getElementById('homeLLMOutput');
 const mainPromptTextarea = document.getElementById('mainPromptTextarea');
 const llmStatus = document.getElementById('llmStatus');
@@ -948,6 +949,23 @@ document.addEventListener('regularSeasonCompleted', async () => {
   renderPostseasonPanel();
 });
 
+function fireRegularSeasonCompletion(detail = {}) {
+  appState.regularSeasonCompleted = true;
+  try {
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(new CustomEvent('regularSeasonCompleted', {
+        detail: {
+          teamId: appState.selectedTeam?.id,
+          date: appState.currentDate,
+          ...detail
+        }
+      }));
+    }
+  } catch (e) {
+    console.warn('정규시즌 종료 이벤트 전파 실패', e);
+  }
+}
+
 function postseasonTeamName(teamId) {
   return TEAMS.find(t => t.id === teamId)?.name || teamId || '-';
 }
@@ -1473,6 +1491,43 @@ async function simulatePlayInForUserTeam() {
   return fetchPostseasonState();
 }
 
+async function fastForwardToPostseason() {
+  if (!appState.selectedTeam) {
+    alert('먼저 팀을 선택하세요.');
+    return;
+  }
+
+  const originalText = btnSkipToPostseason?.textContent;
+  if (btnSkipToPostseason) {
+    btnSkipToPostseason.disabled = true;
+    btnSkipToPostseason.textContent = '직행 준비 중...';
+  }
+
+  const wasSeasonCompleted = !!appState.regularSeasonCompleted;
+
+  try {
+    if (!wasSeasonCompleted) {
+      fireRegularSeasonCompletion({ reason: 'manual-fast-forward' });
+      await updatePostseasonCTA(true);
+    }
+
+    await handleStartPostseasonFlow();
+  } catch (err) {
+    console.error('플레이오프 직행 실패:', err);
+    alert('플레이오프로 바로 이동하지 못했습니다. 다시 시도해주세요.');
+
+    if (!wasSeasonCompleted) {
+      appState.regularSeasonCompleted = false;
+    }
+    await updatePostseasonCTA();
+  } finally {
+    if (btnSkipToPostseason) {
+      btnSkipToPostseason.disabled = false;
+      btnSkipToPostseason.textContent = originalText || '플레이오프 직행 (임시)';
+    }
+  }
+}
+
 async function handleStartPostseasonFlow() {
   if (!appState.selectedTeam) {
     alert('먼저 팀을 선택하세요.');
@@ -1534,6 +1589,12 @@ async function handleStartPostseasonFlow() {
 if (btnStartPostseason) {
   btnStartPostseason.addEventListener('click', async () => {
     await handleStartPostseasonFlow();
+  });
+}
+
+if (btnSkipToPostseason) {
+  btnSkipToPostseason.addEventListener('click', async () => {
+    await fastForwardToPostseason();
   });
 }
 
