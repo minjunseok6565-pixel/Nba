@@ -168,6 +168,7 @@
             <p>현재 시점에서 한 경기를 진행합니다</p>
             <!-- 버튼 ID는 그대로 유지 (JS 연동) -->
             <button id="btnSimGame" style="width:100%;margin-top:6px;">빠른 경기</button>
+            <button id="btnStartPostseason" class="secondary" style="width:100%;margin-top:6px;" disabled>플레이오프 진행</button>
           </div>
 
           <div class="side-title">최근 5경기</div>
@@ -214,6 +215,26 @@
       <div id="homeLLMOutput" class="llm-output muted">
         아직 진행된 경기가 없습니다. 좌측의 &lt;빠른 경기&gt; 버튼을 눌러
         진행 상황을 만들어 보세요.
+      </div>
+    </div>
+
+    <div class="box postseason-box" id="postseasonPanel">
+      <div class="postseason-header">
+        <div>
+          <div class="tab-eyebrow">포스트시즌 진행</div>
+          <h3 id="postseasonPhase">정규시즌 진행 중</h3>
+        </div>
+        <div class="pill" id="postseasonBracketStatus">대기</div>
+      </div>
+      <div class="postseason-grid">
+        <div>
+          <h4>플레이인 &amp; 결과</h4>
+          <div id="playInResults" class="postseason-list muted">정규시즌 종료를 기다리는 중입니다.</div>
+        </div>
+        <div>
+          <h4>브래킷 미리보기</h4>
+          <div id="postseasonBracket" class="postseason-list muted">브래킷이 아직 생성되지 않았습니다.</div>
+        </div>
       </div>
     </div>
   </div>

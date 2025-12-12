@@ -5,6 +5,9 @@ let appState = {
   progressTurns: 0,
   // 인게임 날짜
   currentDate: null,
+  // 정규시즌 종료 여부
+  regularSeasonCompleted: false,
+  postseason: null,
   cachedViews: {
     last_progress_turn_id: null,
     scores: { latest_date: null, games: [] },
