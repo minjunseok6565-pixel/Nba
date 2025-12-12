@@ -21,6 +21,7 @@ def _ensure_postseason_state() -> Dict[str, Any]:
     postseason.setdefault("playoffs", None)
     postseason.setdefault("champion", None)
     postseason.setdefault("my_team_id", None)
+    postseason.setdefault("playoff_player_stats", {})
     return postseason
 
 
@@ -31,11 +32,13 @@ def reset_postseason_state() -> Dict[str, Any]:
         "playoffs": None,
         "champion": None,
         "my_team_id": None,
+        "playoff_player_stats": {},
     }
     cached_views = GAME_STATE.setdefault("cached_views", {})
     playoff_news = cached_views.setdefault("playoff_news", {})
     playoff_news["series_game_counts"] = {}
     playoff_news["items"] = []
+    cached_views.setdefault("stats", {}).pop("playoff_leaders", None)
     return GAME_STATE["postseason"]
 
 
@@ -86,6 +89,48 @@ def _simulate_postseason_game(home_team_id: str, away_team_id: str) -> Dict[str,
         "final_score": score,
         "boxscore": result.get("boxscore"),
     }
+
+
+def _update_playoff_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]) -> None:
+    if not boxscore:
+        return
+
+    postseason = _ensure_postseason_state()
+    playoff_stats = postseason.setdefault("playoff_player_stats", {})
+    track_stats = ["PTS", "AST", "REB", "3PM"]
+
+    for team_rows in boxscore.values():
+        if not isinstance(team_rows, list):
+            continue
+        for row in team_rows:
+            if not isinstance(row, dict):
+                continue
+            player_id = row.get("PlayerID")
+            if player_id is None:
+                continue
+            stat_entry = playoff_stats.setdefault(
+                player_id,
+                {
+                    "player_id": player_id,
+                    "name": row.get("Name"),
+                    "team_id": row.get("Team"),
+                    "games": 0,
+                    "totals": {s: 0.0 for s in track_stats},
+                },
+            )
+
+            stat_entry["name"] = row.get("Name", stat_entry.get("name"))
+            stat_entry["team_id"] = row.get("Team", stat_entry.get("team_id"))
+            stat_entry["games"] = stat_entry.get("games", 0) + 1
+
+            totals = stat_entry.setdefault("totals", {s: 0.0 for s in track_stats})
+            for stat_name in track_stats:
+                try:
+                    totals[stat_name] = float(totals.get(stat_name, 0.0)) + float(
+                        row.get(stat_name, 0) or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
 
 
 def _pick_home_advantage(entry_a: Dict[str, Any], entry_b: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -327,6 +372,8 @@ def _simulate_one_series_game(series: Dict[str, Any]) -> Dict[str, Any]:
 
     game_result = _simulate_postseason_game(home_id, away_id)
     series.setdefault("games", []).append(game_result)
+
+    _update_playoff_player_stats_from_boxscore(game_result.get("boxscore"))
 
     wins = series.setdefault("wins", {})
     wins[game_result["winner"]] = wins.get(game_result["winner"], 0) + 1

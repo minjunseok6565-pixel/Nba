@@ -28,7 +28,7 @@ from playoffs import (
     reset_postseason_state,
 )
 from news_ai import refresh_playoff_news, refresh_weekly_news
-from stats_util import compute_league_leaders
+from stats_util import compute_league_leaders, compute_playoff_league_leaders
 from team_utils import (
     get_conference_standings,
     get_team_cards,
@@ -192,6 +192,13 @@ async def api_stats_leaders():
     # UI to break. Normalize here so the client always receives
     # `{ leaders: { PTS: [...], AST: [...], ... }, updated_at: <iso date> }`.
     leaders = compute_league_leaders()
+    current_date = GAME_STATE.get("current_date")
+    return {"leaders": leaders, "updated_at": current_date}
+
+
+@app.get("/api/stats/playoffs/leaders")
+async def api_playoff_stats_leaders():
+    leaders = compute_playoff_league_leaders()
     current_date = GAME_STATE.get("current_date")
     return {"leaders": leaders, "updated_at": current_date}
 
