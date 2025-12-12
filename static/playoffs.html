@@ -198,6 +198,129 @@
             <div id="newsList" class="news-list"></div>
           </section>
         </main>
+
+        <section id="tactics-screen" class="tactics-screen">
+          <div class="tactics-screen-header">
+            <div class="tactics-screen-left">
+              <button id="btnCloseTactics" class="ghost">← 메인으로 돌아가기</button>
+              <div>
+                <div class="tab-eyebrow">맞춤 매치업 플래너</div>
+                <h2 class="tactics-screen-title">상대 맞춤 전술</h2>
+              </div>
+            </div>
+            <div class="tactics-screen-meta" id="tacticsSeriesMeta">시리즈 매치업 정보 없음</div>
+          </div>
+
+          <div class="tactics-screen-body">
+            <div class="tactics-detail-column">
+              <div class="tactics-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-eyebrow">라인업 & 로테이션</div>
+                    <h3>스타팅 · 로테이션 · 출전시간</h3>
+                  </div>
+                  <div class="chip" id="tacticsRotationLabel">로테이션 9명</div>
+                </div>
+
+                <div class="tactics-grid two-col">
+                  <div>
+                    <label class="tactics-label">스타팅 라인업</label>
+                    <div class="starter-grid" id="starterGrid"></div>
+                  </div>
+                  <div>
+                    <label class="tactics-label">로테이션 인원</label>
+                    <select id="rotationSizeSelect" class="wide-select">
+                      <option value="6">6명</option>
+                      <option value="7">7명</option>
+                      <option value="8">8명</option>
+                      <option value="9" selected>9명</option>
+                      <option value="10">10명</option>
+                    </select>
+                    <div class="rotation-pool" id="rotationPool"></div>
+                  </div>
+                </div>
+
+                <div class="minutes-board" id="minutesBoard"></div>
+              </div>
+
+              <div class="tactics-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-eyebrow">매치업</div>
+                    <h3>개별 선수 수비 매치업</h3>
+                  </div>
+                  <div class="chip muted-chip">코트에 동시에 있을 때 적용</div>
+                </div>
+                <div class="matchup-list" id="matchupList"></div>
+              </div>
+
+              <div class="tactics-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-eyebrow">미스 매치 헌팅</div>
+                    <h3>표적 공략 설정</h3>
+                  </div>
+                  <div class="chip">픽앤롤 / 아이솔</div>
+                </div>
+                <div class="mismatch-grid">
+                  <div>
+                    <label class="tactics-label">공격 전술</label>
+                    <select id="mismatchAction" class="wide-select">
+                      <option value="pnr">픽앤롤 중점</option>
+                      <option value="iso">아이솔레이션 중점</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="tactics-label">공격 주도 선수</label>
+                    <select id="mismatchAttacker" class="wide-select"></select>
+                  </div>
+                  <div>
+                    <label class="tactics-label">공략 대상</label>
+                    <select id="mismatchTarget" class="wide-select"></select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tactics-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-eyebrow">특정 선수 수비 지침</div>
+                    <h3>더블팀 · 디나이 · 새깅</h3>
+                  </div>
+                  <button id="btnAddDefenseRule" class="secondary">+ 대상 추가</button>
+                </div>
+                <div class="defense-rule-list" id="defenseRules"></div>
+              </div>
+            </div>
+
+            <aside class="tactics-opponent-column">
+              <div class="tactics-card opponent-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-eyebrow">상대 정보</div>
+                    <h3 id="opponentName">상대 팀 미정</h3>
+                  </div>
+                  <div class="chip" id="opponentSeed">-위 시드</div>
+                </div>
+                <div class="opponent-meta">
+                  <div>
+                    <div class="muted">정규시즌 순위</div>
+                    <strong id="opponentStanding">-</strong>
+                  </div>
+                  <div>
+                    <div class="muted">주요 공격/수비</div>
+                    <strong id="opponentSchemes">-</strong>
+                  </div>
+                </div>
+
+                <div class="opponent-roster">
+                  <div class="card-eyebrow">주요 로스터 12명</div>
+                  <div class="opponent-table" id="opponentRosterTable"></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
       </div>
     </section>
   </div>
@@ -225,6 +348,36 @@
     const tacticsPanel = document.getElementById('tacticsPanel');
     const btnToggleTactics = document.getElementById('btnToggleTactics');
     const btnPlayGame = document.getElementById('btnPlayGame');
+    const playoffMain = document.querySelector('.playoff-main');
+    const tacticsScreen = document.getElementById('tactics-screen');
+    const tacticsSeriesMeta = document.getElementById('tacticsSeriesMeta');
+    const btnCloseTactics = document.getElementById('btnCloseTactics');
+    const opponentName = document.getElementById('opponentName');
+    const opponentSeed = document.getElementById('opponentSeed');
+    const opponentStanding = document.getElementById('opponentStanding');
+    const opponentSchemes = document.getElementById('opponentSchemes');
+    const opponentRosterTable = document.getElementById('opponentRosterTable');
+    const starterGrid = document.getElementById('starterGrid');
+    const rotationSizeSelect = document.getElementById('rotationSizeSelect');
+    const rotationPool = document.getElementById('rotationPool');
+    const minutesBoard = document.getElementById('minutesBoard');
+    const tacticsRotationLabel = document.getElementById('tacticsRotationLabel');
+    const matchupList = document.getElementById('matchupList');
+    const mismatchAction = document.getElementById('mismatchAction');
+    const mismatchAttacker = document.getElementById('mismatchAttacker');
+    const mismatchTarget = document.getElementById('mismatchTarget');
+    const btnAddDefenseRule = document.getElementById('btnAddDefenseRule');
+    const defenseRules = document.getElementById('defenseRules');
+
+    const mockMyPlayers = [
+      '가드 알파', '가드 브라보', '포워드 찰리', '포워드 델타', '센터 에코',
+      '식스맨 폭스트롯', '벤치 골프', '벤치 호텔', '벤치 인디아', '벤치 줄리엣', '벤치 킬로', '벤치 리마'
+    ];
+
+    const mockOpponentPlayers = [
+      '상대 가드 1', '상대 가드 2', '상대 윙 1', '상대 윙 2', '상대 센터 1',
+      '상대 식스맨', '상대 롤플레이어 1', '상대 롤플레이어 2', '상대 롤플레이어 3', '상대 롤플레이어 4', '상대 롤플레이어 5', '상대 롤플레이어 6'
+    ];
 
     const appState = {
       selectedTeam: null,
@@ -513,8 +666,192 @@
       });
     }
 
+    function openTacticsScreen() {
+      playoffMain.classList.add('hidden');
+      tacticsScreen.classList.add('active');
+      hydrateTacticsView();
+    }
+
+    function closeTacticsScreen() {
+      tacticsScreen.classList.remove('active');
+      playoffMain.classList.remove('hidden');
+    }
+
+    function hydrateTacticsView() {
+      renderSeriesMeta();
+      renderOpponentPanel();
+      renderStarterSelectors();
+      renderRotationSelectors();
+      renderMinutesBoard();
+      renderMatchupList();
+      renderMismatchDropdowns();
+      if (!defenseRules.childElementCount) {
+        addDefenseRuleRow();
+      }
+    }
+
+    function renderSeriesMeta() {
+      const series = findMySeries();
+      if (!series) {
+        tacticsSeriesMeta.textContent = '시리즈 매치업 정보 없음';
+        return;
+      }
+      const opponentId = series.home_court === appState.selectedTeam.id ? series.road : series.home_court;
+      tacticsSeriesMeta.textContent = `${getTeamName(appState.selectedTeam.id)} vs ${getTeamName(opponentId)} · ${series.round || ''}`;
+    }
+
+    function renderOpponentPanel() {
+      const series = findMySeries();
+      const opponentId = series ? (series.home_court === appState.selectedTeam.id ? series.road : series.home_court) : null;
+      opponentName.textContent = opponentId ? getTeamName(opponentId) : '상대 팀 미정';
+      opponentSeed.textContent = series?.seedings?.[opponentId] ? `${series.seedings[opponentId]}위 시드` : '시드 정보 없음';
+      opponentStanding.textContent = series?.round || '정규시즌 순위 정보 없음';
+      opponentSchemes.textContent = '공격: PnR / 수비: Drop Coverage';
+
+      const roster = buildMockOpponentRoster(opponentId);
+      opponentRosterTable.innerHTML = '';
+      const header = document.createElement('div');
+      header.className = 'opponent-row opponent-header';
+      header.innerHTML = '<span>선수</span><span>GP</span><span>PTS</span><span>AST</span><span>REB</span><span>BLK</span>';
+      opponentRosterTable.appendChild(header);
+      roster.forEach(player => {
+        const row = document.createElement('div');
+        row.className = 'opponent-row';
+        row.innerHTML = `
+          <span>${player.name}</span>
+          <span>${player.gp}</span>
+          <span>${player.pts}</span>
+          <span>${player.ast}</span>
+          <span>${player.reb}</span>
+          <span>${player.blk}</span>
+        `;
+        opponentRosterTable.appendChild(row);
+      });
+    }
+
+    function buildMockOpponentRoster(opponentId) {
+      return mockOpponentPlayers.map((name, idx) => ({
+        name: opponentId ? `${name} (${opponentId})` : name,
+        gp: 78 - idx,
+        pts: (16 - idx * 0.4).toFixed(1),
+        ast: (5 - idx * 0.2).toFixed(1),
+        reb: (6 - idx * 0.15).toFixed(1),
+        blk: (1.1 - idx * 0.05).toFixed(1)
+      })).slice(0, 12);
+    }
+
+    function renderStarterSelectors() {
+      starterGrid.innerHTML = '';
+      for (let i = 0; i < 5; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'starter-slot';
+        wrapper.innerHTML = `
+          <div class="muted">스타터 ${i + 1}</div>
+          <select class="wide-select">
+            ${mockMyPlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+          </select>
+        `;
+        starterGrid.appendChild(wrapper);
+      }
+    }
+
+    function renderRotationSelectors() {
+      rotationPool.innerHTML = '';
+      const size = parseInt(rotationSizeSelect.value, 10) || 9;
+      tacticsRotationLabel.textContent = `로테이션 ${size}명`;
+      mockMyPlayers.forEach((player, idx) => {
+        const row = document.createElement('label');
+        row.className = 'rotation-row';
+        const checked = idx < size ? 'checked' : '';
+        row.innerHTML = `
+          <input type="checkbox" value="${player}" ${checked} />
+          <span>${player}</span>
+        `;
+        row.querySelector('input').addEventListener('change', () => {
+          renderMinutesBoard();
+          renderMatchupList();
+          renderMismatchDropdowns();
+        });
+        rotationPool.appendChild(row);
+      });
+    }
+
+    function getRotationPlayers() {
+      return Array.from(rotationPool.querySelectorAll('input[type="checkbox"]:checked')).map(el => el.value);
+    }
+
+    function renderMinutesBoard() {
+      const rotationPlayers = getRotationPlayers();
+      minutesBoard.innerHTML = '';
+      rotationPlayers.forEach(player => {
+        const row = document.createElement('div');
+        row.className = 'minute-row';
+        row.innerHTML = `
+          <div class="minute-name">${player}</div>
+          <div class="minute-inputs">
+            <label>출전시간 <input type="number" min="0" max="48" value="32" /></label>
+            <label>역할 <input type="text" placeholder="예: 2nd Unit 핸들러" /></label>
+          </div>
+        `;
+        minutesBoard.appendChild(row);
+      });
+    }
+
+    function renderMatchupList() {
+      const rotationPlayers = getRotationPlayers();
+      matchupList.innerHTML = '';
+      rotationPlayers.forEach(player => {
+        const row = document.createElement('div');
+        row.className = 'matchup-row';
+        row.innerHTML = `
+          <div class="matchup-self">${player}</div>
+          <div class="matchup-vs">↔</div>
+          <select class="wide-select">
+            <option value="">코트에 있을 때 누구를 막나요?</option>
+            ${mockOpponentPlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+          </select>
+        `;
+        matchupList.appendChild(row);
+      });
+    }
+
+    function renderMismatchDropdowns() {
+      const rotationPlayers = getRotationPlayers();
+      mismatchAttacker.innerHTML = rotationPlayers.map(p => `<option value="${p}">${p}</option>`).join('');
+      mismatchTarget.innerHTML = mockOpponentPlayers.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+
+    function addDefenseRuleRow() {
+      const row = document.createElement('div');
+      row.className = 'defense-row';
+      row.innerHTML = `
+        <select class="wide-select">
+          ${mockOpponentPlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+        </select>
+        <select class="wide-select">
+          <option value="double">더블팀</option>
+          <option value="deny">디나이</option>
+          <option value="sag">새깅</option>
+        </select>
+      `;
+      defenseRules.appendChild(row);
+    }
+
+    rotationSizeSelect.addEventListener('change', () => {
+      renderRotationSelectors();
+      renderMinutesBoard();
+      renderMatchupList();
+      renderMismatchDropdowns();
+    });
+
+    btnAddDefenseRule.addEventListener('click', addDefenseRuleRow);
+
     btnToggleTactics.addEventListener('click', () => {
-      tacticsPanel.classList.toggle('open');
+      openTacticsScreen();
+    });
+
+    btnCloseTactics.addEventListener('click', () => {
+      closeTacticsScreen();
     });
 
     btnPlayGame.addEventListener('click', async () => {
