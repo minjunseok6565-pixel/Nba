@@ -237,6 +237,19 @@ async function simulateGameProgress() {
     // 1) 시즌 종료 알림
     alert("더 이상 남은 정규시즌 경기가 없습니다.");
 
+    appState.regularSeasonCompleted = true;
+    try {
+      if (typeof document !== "undefined") {
+        document.dispatchEvent(
+          new CustomEvent("regularSeasonCompleted", {
+            detail: { teamId: userTeam.id, date: appState.currentDate }
+          })
+        );
+      }
+    } catch (e) {
+      console.warn("정규시즌 종료 이벤트 전파 실패", e);
+    }
+
     // 2) 시즌 결산 안내 알림
     alert("시즌 결산에 돌입합니다.");
 

@@ -190,6 +190,12 @@ def get_conference_standings() -> Dict[str, List[Dict[str, Any]]]:
             r["gb"] = gb
         for idx, r in enumerate(rows_sorted, start=1):
             r["rank"] = idx
+            if idx <= 6:
+                r["postseason_slot"] = "playoffs"
+            elif idx <= 10:
+                r["postseason_slot"] = "play-in"
+            else:
+                r["postseason_slot"] = "eliminated"
         return rows_sorted
 
     standings["east"] = sort_and_gb(standings["east"])

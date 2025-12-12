@@ -32,9 +32,16 @@ const homeLog = document.getElementById('homeLog');
 const homeUserInput = document.getElementById('homeUserInput');
 const btnSendToLLM = document.getElementById('btnSendToLLM');
 const btnSimGame = document.getElementById('btnSimGame');
+const btnStartPostseason = document.getElementById('btnStartPostseason');
+const btnSkipToPostseason = document.getElementById('btnSkipToPostseason');
 const homeLLMOutput = document.getElementById('homeLLMOutput');
 const mainPromptTextarea = document.getElementById('mainPromptTextarea');
 const llmStatus = document.getElementById('llmStatus');
+const postseasonPanel = document.getElementById('postseasonPanel');
+const postseasonPhase = document.getElementById('postseasonPhase');
+const postseasonBracketStatus = document.getElementById('postseasonBracketStatus');
+const playInResults = document.getElementById('playInResults');
+const postseasonBracket = document.getElementById('postseasonBracket');
 
 // Scores / Schedule 탭
 const scoresTable = document.getElementById('scoresTable');
@@ -175,6 +182,8 @@ function selectTeam(teamId) {
 
   // 팀을 선택하면 초기 시즌 스케줄 / 상태를 비워두거나 재설정할 수도 있음
   appState.progressTurns = 0;
+  appState.regularSeasonCompleted = false;
+  appState.postseason = null;
   appState.cachedViews = {
     last_progress_turn_id: null,
     scores: { latest_date: null, games: [] },
@@ -194,6 +203,8 @@ function selectTeam(teamId) {
 
   // 선택 시점에 로스터 요약을 미리 불러오기(서버에서)
   loadRosterForTeam(team.id);
+
+  updatePostseasonCTA();
 }
 
 // 팀 선택 완료 버튼
@@ -874,6 +885,272 @@ async function renderStandings() {
   };
 
   standingsTable.innerHTML = `${renderConference(east, '동부 컨퍼런스')}${renderConference(west, '서부 컨퍼런스')}`;
+
+  updatePostseasonCTA();
+}
+
+function findStandingRow(teamId) {
+  const cv = appState.cachedViews?.standings;
+  if (!cv || !teamId) return null;
+  return [...(cv.east || []), ...(cv.west || [])].find(r => r.team_id === teamId) || null;
+}
+
+function inferPostseasonSlot(teamId) {
+  const row = findStandingRow(teamId);
+  if (!row) return null;
+  if (row.postseason_slot) return row.postseason_slot;
+  const rank = row.rank;
+  if (!rank) return null;
+  if (rank <= 6) return 'playoffs';
+  if (rank <= 10) return 'play-in';
+  return 'eliminated';
+}
+
+async function updatePostseasonCTA(forceStandings = false) {
+  if (!btnStartPostseason) return;
+
+  if (forceStandings) {
+    await loadStandingsIfNeeded(true);
+  }
+
+  const teamId = appState.selectedTeam?.id;
+  const slot = inferPostseasonSlot(teamId);
+  const seasonDone = !!appState.regularSeasonCompleted;
+
+  if (!seasonDone) {
+    btnStartPostseason.disabled = true;
+    btnStartPostseason.textContent = '플레이오프 진행';
+    btnStartPostseason.title = '정규시즌이 끝나면 활성화됩니다';
+    return;
+  }
+
+  if (!slot) {
+    btnStartPostseason.disabled = true;
+    btnStartPostseason.textContent = '플레이오프 진행';
+    btnStartPostseason.title = '순위를 불러오는 중입니다';
+    return;
+  }
+
+  btnStartPostseason.disabled = false;
+  btnStartPostseason.title = '';
+
+  if (slot === 'playoffs') {
+    btnStartPostseason.textContent = '플레이오프 브래킷 생성';
+  } else if (slot === 'play-in') {
+    btnStartPostseason.textContent = '플레이인부터 진행';
+  } else {
+    btnStartPostseason.textContent = '오프시즌 (미구현)';
+  }
+}
+
+document.addEventListener('regularSeasonCompleted', async () => {
+  appState.regularSeasonCompleted = true;
+  await updatePostseasonCTA(true);
+  renderPostseasonPanel();
+});
+
+function fireRegularSeasonCompletion(detail = {}) {
+  appState.regularSeasonCompleted = true;
+  try {
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(new CustomEvent('regularSeasonCompleted', {
+        detail: {
+          teamId: appState.selectedTeam?.id,
+          date: appState.currentDate,
+          ...detail
+        }
+      }));
+    }
+  } catch (e) {
+    console.warn('정규시즌 종료 이벤트 전파 실패', e);
+  }
+}
+
+function postseasonTeamName(teamId) {
+  return TEAMS.find(t => t.id === teamId)?.name || teamId || '-';
+}
+
+function describeSeedEntry(entry) {
+  if (!entry) return '-';
+  const label = postseasonTeamName(entry.team_id);
+  return entry.seed ? `${label} (${entry.seed}번 시드)` : label;
+}
+
+function renderSeriesSummary(matchup, title, { isPlayIn = false } = {}) {
+  if (!matchup) return '';
+  const homeName = describeSeedEntry(matchup.home);
+  const awayName = describeSeedEntry(matchup.away);
+  const res = matchup.result;
+  const score = res
+    ? `${res.home_score ?? '-'} : ${res.away_score ?? '-'}`
+    : '미진행';
+  const winner = res?.winner ? postseasonTeamName(res.winner) : null;
+  const status = winner ? `${winner} 승` : '대기 중';
+  const log = res?.date ? ` · ${res.date}` : '';
+
+  return `
+    <li class="postseason-item">
+      <div class="postseason-item-title">${title}${isPlayIn ? '' : ''}</div>
+      <div class="postseason-item-body">
+        <div>${homeName} vs ${awayName}</div>
+        <div>${score}${log} · ${status}</div>
+      </div>
+    </li>
+  `;
+}
+
+function renderPlayInProgress(playInState) {
+  if (!playInResults) return;
+  if (!playInState) {
+    playInResults.classList.add('muted');
+    playInResults.textContent = '플레이인 정보가 없습니다.';
+    return;
+  }
+
+  let html = '';
+  ['east', 'west'].forEach(conf => {
+    const confState = playInState[conf];
+    if (!confState) return;
+    const title = conf === 'east' ? 'Eastern' : 'Western';
+    const matchups = confState.matchups || {};
+    html += `<div class="postseason-conf-title">${title}</div><ul class="postseason-list">`;
+    html += renderSeriesSummary(matchups.seven_vs_eight, '7위 vs 8위', { isPlayIn: true });
+    html += renderSeriesSummary(matchups.nine_vs_ten, '9위 vs 10위', { isPlayIn: true });
+    html += renderSeriesSummary(matchups.final, '패자전/최종전', { isPlayIn: true });
+    html += '</ul>';
+  });
+
+  playInResults.classList.remove('muted');
+  playInResults.innerHTML = html || '<div class="muted">플레이인 매치업이 없습니다.</div>';
+}
+
+function buildBracketFromPostseason(postseason) {
+  if (!postseason) return null;
+  if (postseason.playoffs?.bracket) return postseason.playoffs.bracket;
+
+  const field = postseason.field;
+  const playIn = postseason.play_in;
+  if (!field || !playIn) return null;
+
+  const bracket = { east: { quarterfinals: [] }, west: { quarterfinals: [] } };
+  ['east', 'west'].forEach(conf => {
+    const seeds = {};
+    (field[conf]?.auto_bids || []).forEach(entry => {
+      if (entry.seed) seeds[entry.seed] = entry;
+    });
+    const confPlayIn = playIn[conf] || {};
+    if (confPlayIn.seed7) seeds[7] = confPlayIn.seed7;
+    if (confPlayIn.seed8) seeds[8] = confPlayIn.seed8;
+
+    const pairs = [
+      [1, 8],
+      [2, 7],
+      [3, 6],
+      [4, 5]
+    ];
+    bracket[conf].quarterfinals = pairs
+      .filter(([a, b]) => seeds[a] && seeds[b])
+      .map(([top, low]) => ({
+        round: 'Conference Quarterfinals',
+        matchup: `${top}번 vs ${low}번`,
+        home_court: seeds[top].team_id,
+        road: seeds[low].team_id,
+        wins: { [seeds[top].team_id]: 0, [seeds[low].team_id]: 0 }
+      }));
+  });
+
+  return bracket;
+}
+
+function renderBracketPreview(bracket) {
+  if (!postseasonBracket) return;
+  if (!bracket) {
+    postseasonBracket.classList.add('muted');
+    postseasonBracket.textContent = '브래킷이 아직 생성되지 않았습니다.';
+    return;
+  }
+
+  let html = '';
+  ['east', 'west'].forEach(conf => {
+    const title = conf === 'east' ? 'Eastern' : 'Western';
+    const seriesList = bracket[conf]?.quarterfinals || [];
+    html += `<div class="postseason-conf-title">${title}</div><ul class="postseason-list">`;
+    seriesList.forEach(series => {
+      const home = postseasonTeamName(series.home_court);
+      const road = postseasonTeamName(series.road);
+      const wHome = series.wins?.[series.home_court] ?? 0;
+      const wRoad = series.wins?.[series.road] ?? 0;
+      html += `
+        <li class="postseason-item">
+          <div class="postseason-item-title">${series.matchup || '시리즈'}</div>
+          <div class="postseason-item-body">${home} ${wHome} - ${wRoad} ${road}</div>
+        </li>
+      `;
+    });
+    html += '</ul>';
+  });
+
+  if (bracket.finals) {
+    const finals = bracket.finals;
+    const home = postseasonTeamName(finals.home_court);
+    const road = postseasonTeamName(finals.road);
+    const wHome = finals.wins?.[finals.home_court] ?? 0;
+    const wRoad = finals.wins?.[finals.road] ?? 0;
+    html += `
+      <div class="postseason-conf-title">NBA Finals</div>
+      <ul class="postseason-list">
+        <li class="postseason-item">
+          <div class="postseason-item-title">파이널</div>
+          <div class="postseason-item-body">${home} ${wHome} - ${wRoad} ${road}</div>
+        </li>
+      </ul>
+    `;
+  }
+
+  postseasonBracket.classList.remove('muted');
+  postseasonBracket.innerHTML = html || '<div class="muted">브래킷이 준비되지 않았습니다.</div>';
+}
+
+function renderPostseasonPanel() {
+  if (!postseasonPanel) return;
+  const postseason = appState.postseason;
+
+  if (!appState.regularSeasonCompleted) {
+    postseasonPhase.textContent = '정규시즌 진행 중';
+    postseasonBracketStatus.textContent = '대기';
+    playInResults.classList.add('muted');
+    playInResults.textContent = '정규시즌 종료를 기다리는 중입니다.';
+    postseasonBracket.classList.add('muted');
+    postseasonBracket.textContent = '브래킷이 아직 생성되지 않았습니다.';
+    return;
+  }
+
+  if (!postseason) {
+    postseasonPhase.textContent = '포스트시즌 미설정';
+    postseasonBracketStatus.textContent = '필드 없음';
+    playInResults.textContent = '플레이인 정보가 없습니다.';
+    postseasonBracket.textContent = '브래킷이 아직 생성되지 않았습니다.';
+    return;
+  }
+
+  const hasPlayoffs = !!postseason.playoffs;
+  postseasonPhase.textContent = hasPlayoffs
+    ? postseason.playoffs.current_round || '플레이오프 진행 중'
+    : '플레이인 진행 중';
+
+  renderPlayInProgress(postseason.play_in);
+  const bracket = buildBracketFromPostseason(postseason);
+  renderBracketPreview(bracket);
+
+  if (postseason.playoffs?.champion) {
+    postseasonBracketStatus.textContent = `${postseasonTeamName(postseason.playoffs.champion)} 우승!`;
+  } else if (postseason.playoffs) {
+    postseasonBracketStatus.textContent = '플레이오프 진행 중';
+  } else if (bracket) {
+    postseasonBracketStatus.textContent = '브래킷 생성됨';
+  } else {
+    postseasonBracketStatus.textContent = '대기';
+  }
 }
 
 async function loadStatsLeadersIfNeeded(force = false) {
@@ -1176,8 +1453,155 @@ function renderSidebarRecentGames() {
   });
 }
 
+async function fetchPostseasonState() {
+  const res = await fetch('/api/postseason/state');
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+  const data = await res.json();
+  appState.postseason = data;
+  renderPostseasonPanel();
+  return data;
+}
+
+async function simulatePlayInForUserTeam() {
+  const myTeamId = appState.selectedTeam?.id;
+  let postseason = appState.postseason;
+
+  for (let i = 0; i < 3; i += 1) {
+    postseason = await fetchPostseasonState();
+    if (postseason?.playoffs) return postseason;
+
+    const playIn = postseason?.play_in || {};
+    const knockedOut = Object.values(playIn).some(conf =>
+      (conf.eliminated || []).some(t => t.team_id === myTeamId)
+    );
+    if (knockedOut) return postseason;
+
+    const res = await fetch('/api/postseason/play-in/my-team-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+  }
+
+  return fetchPostseasonState();
+}
+
+async function fastForwardToPostseason() {
+  if (!appState.selectedTeam) {
+    alert('먼저 팀을 선택하세요.');
+    return;
+  }
+
+  const originalText = btnSkipToPostseason?.textContent;
+  if (btnSkipToPostseason) {
+    btnSkipToPostseason.disabled = true;
+    btnSkipToPostseason.textContent = '직행 준비 중...';
+  }
+
+  const wasSeasonCompleted = !!appState.regularSeasonCompleted;
+
+  try {
+    if (!wasSeasonCompleted) {
+      fireRegularSeasonCompletion({ reason: 'manual-fast-forward' });
+      await updatePostseasonCTA(true);
+    }
+
+    await handleStartPostseasonFlow();
+  } catch (err) {
+    console.error('플레이오프 직행 실패:', err);
+    alert('플레이오프로 바로 이동하지 못했습니다. 다시 시도해주세요.');
+
+    if (!wasSeasonCompleted) {
+      appState.regularSeasonCompleted = false;
+    }
+    await updatePostseasonCTA();
+  } finally {
+    if (btnSkipToPostseason) {
+      btnSkipToPostseason.disabled = false;
+      btnSkipToPostseason.textContent = originalText || '플레이오프 직행 (임시)';
+    }
+  }
+}
+
+async function handleStartPostseasonFlow() {
+  if (!appState.selectedTeam) {
+    alert('먼저 팀을 선택하세요.');
+    return;
+  }
+
+  const slot = inferPostseasonSlot(appState.selectedTeam.id);
+  await updatePostseasonCTA(true);
+
+  if (slot === 'eliminated') {
+    alert('정규시즌에서 탈락했습니다. 오프시즌 화면은 아직 미구현입니다.');
+    return;
+  }
+
+  const originalText = btnStartPostseason.textContent;
+  btnStartPostseason.disabled = true;
+  btnStartPostseason.textContent = '포스트시즌 설정 중...';
+
+  try {
+    await fetch('/api/postseason/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const resSetup = await fetch('/api/postseason/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        my_team_id: appState.selectedTeam.id,
+        use_random_field: false
+      })
+    });
+
+    if (!resSetup.ok) {
+      throw new Error(await resSetup.text());
+    }
+
+    let postseason = await fetchPostseasonState();
+    if (slot === 'play-in') {
+      postseason = await simulatePlayInForUserTeam();
+    }
+
+    if (postseason?.playoffs) {
+      btnStartPostseason.textContent = '플레이오프 시뮬레이션 준비 완료';
+    } else {
+      btnStartPostseason.textContent = originalText;
+    }
+    renderPostseasonPanel();
+  } catch (err) {
+    console.error('포스트시즌 설정 실패:', err);
+    alert('포스트시즌을 준비하는 중 오류가 발생했습니다. 콘솔 로그를 확인해주세요.');
+    btnStartPostseason.textContent = originalText;
+  } finally {
+    btnStartPostseason.disabled = false;
+    updatePostseasonCTA();
+  }
+}
+
+if (btnStartPostseason) {
+  btnStartPostseason.addEventListener('click', async () => {
+    await handleStartPostseasonFlow();
+  });
+}
+
+if (btnSkipToPostseason) {
+  btnSkipToPostseason.addEventListener('click', async () => {
+    await fastForwardToPostseason();
+  });
+}
+
 
 // 초기화
 
 renderTeamCards();
 showScreen('apiKey');
+updatePostseasonCTA();
+renderPostseasonPanel();

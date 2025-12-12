@@ -9,30 +9,8 @@
 </head>
 <body>
   <div id="app" class="playoff-app">
-    <!-- STEP 1: 팀 선택 -->
-    <section id="screen-team-select" class="step active">
-      <div class="center-wrapper">
-        <div class="logo-large" style="margin-bottom:8px;">
-          <span class="logo">느바 시뮬 · <strong>팀 선택</strong></span>
-        </div>
-        <p class="muted" style="font-size:0.88rem;">
-          GM으로 플레이할 팀을 선택하세요. 선택한 팀은 바로 플레이오프에 직행합니다.
-        </p>
-
-        <div class="team-grid" id="teamGrid"></div>
-
-        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;">
-          <div>
-            <div class="muted" style="margin-bottom:2px;">선택한 팀</div>
-            <div><strong id="chosenTeamLabel">없음</strong></div>
-          </div>
-          <button id="btnTeamContinue" disabled>이 팀으로 플레이오프 시작</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- STEP 3: 플레이오프 메인 화면 -->
-    <section id="screen-main" class="step">
+    <!-- STEP: 플레이오프 메인 화면 -->
+    <section id="screen-main" class="step active">
       <div class="main-shell">
         <header class="top-nav">
           <div class="top-nav-left">
@@ -327,11 +305,7 @@
 
   <script src="/static/state.js"></script>
   <script>
-    const screenTeamSelect = document.getElementById('screen-team-select');
     const screenMain = document.getElementById('screen-main');
-    const teamGrid = document.getElementById('teamGrid');
-    const chosenTeamLabel = document.getElementById('chosenTeamLabel');
-    const btnTeamContinue = document.getElementById('btnTeamContinue');
     const currentTeamLabel = document.getElementById('currentTeamLabel');
     const roundLabel = document.getElementById('roundLabel');
     const progressLabel = document.getElementById('progressLabel');
@@ -369,16 +343,6 @@
     const btnAddDefenseRule = document.getElementById('btnAddDefenseRule');
     const defenseRules = document.getElementById('defenseRules');
 
-    const mockMyPlayers = [
-      '가드 알파', '가드 브라보', '포워드 찰리', '포워드 델타', '센터 에코',
-      '식스맨 폭스트롯', '벤치 골프', '벤치 호텔', '벤치 인디아', '벤치 줄리엣', '벤치 킬로', '벤치 리마'
-    ];
-
-    const mockOpponentPlayers = [
-      '상대 가드 1', '상대 가드 2', '상대 윙 1', '상대 윙 2', '상대 센터 1',
-      '상대 식스맨', '상대 롤플레이어 1', '상대 롤플레이어 2', '상대 롤플레이어 3', '상대 롤플레이어 4', '상대 롤플레이어 5', '상대 롤플레이어 6'
-    ];
-
     const appState = {
       selectedTeam: null,
       postseason: null,
@@ -387,49 +351,50 @@
       tactics: {},
     };
 
-    function showStep(name) {
-      screenTeamSelect.style.display = name === 'team' ? 'block' : 'none';
-      screenMain.style.display = name === 'main' ? 'block' : 'none';
-    }
+    const teamDetailCache = {};
 
     function getTeamName(teamId) {
       const team = TEAMS.find(t => t.id === teamId);
       return team ? team.name : teamId || '-';
     }
 
-    function renderTeamCards() {
-      teamGrid.innerHTML = '';
-      TEAMS.forEach(team => {
-        const card = document.createElement('div');
-        card.className = 'team-card';
-        card.innerHTML = `
-          <h3>${team.name}</h3>
-          <p>캡 상황: ${team.cap}</p>
-          <p>전력: ${team.overall}</p>
-          <p>난이도: ${team.difficulty}</p>
-        `;
-        card.addEventListener('click', () => selectTeam(team));
-        teamGrid.appendChild(card);
-      });
+    function getTeamMeta(teamId) {
+      return TEAMS.find(t => t.id === teamId) || { id: teamId, name: teamId };
     }
 
-    function selectTeam(team) {
-      appState.selectedTeam = team;
-      chosenTeamLabel.textContent = team.name;
-      btnTeamContinue.disabled = false;
+    async function ensureTeamDetail(teamId) {
+      if (!teamId) return null;
+      if (teamDetailCache[teamId]) return teamDetailCache[teamId];
+      const res = await fetch(`/api/team-detail/${teamId}`);
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const data = await res.json();
+      teamDetailCache[teamId] = data;
+      return data;
     }
 
-    btnTeamContinue.addEventListener('click', async () => {
-      if (!appState.selectedTeam) return;
-      currentTeamLabel.textContent = appState.selectedTeam.name;
-      await startPlayoffSetup();
-      showStep('main');
-      activateTab('home');
-    });
+    function getCachedRoster(teamId) {
+      return (teamDetailCache[teamId]?.roster || []).slice();
+    }
+
+    function playerLabel(player) {
+      if (!player) return '-';
+      const parts = [];
+      if (player.pos) parts.push(player.pos);
+      if (player.ovr != null) parts.push(`OVR ${Math.round(player.ovr)}`);
+      const meta = parts.length ? ` (${parts.join(' · ')})` : '';
+      return `${player.name}${meta}`;
+    }
+
 
     navTabs.forEach(tab => {
       tab.addEventListener('click', () => activateTab(tab.dataset.tab));
     });
+
+    screenMain.style.display = 'block';
+    activateTab('home');
+    bootstrapPostseason();
 
     function activateTab(tabName) {
       document.querySelectorAll('.tab-screen').forEach(el => el.classList.remove('active'));
@@ -441,19 +406,43 @@
       tabTitle.textContent = tabName.charAt(0).toUpperCase() + tabName.slice(1);
     }
 
-    async function startPlayoffSetup() {
-      bracketStatus.textContent = '브래킷 초기화 중...';
-      try {
-        await fetch('/api/postseason/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        await fetch('/api/postseason/setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ my_team_id: appState.selectedTeam.id, use_random_field: true })
-        });
-        await refreshPostseason();
-        await Promise.all([refreshStats(), refreshNews()]);
-      } catch (err) {
-        bracketStatus.textContent = '브래킷 초기화 실패';
+    function syncSelectedTeamFromState() {
+      const postseason = appState.postseason || {};
+      const myId = postseason.my_team_id;
+      if (myId) {
+        appState.selectedTeam = getTeamMeta(myId);
+      } else if (!appState.selectedTeam) {
+        appState.selectedTeam = TEAMS[0];
+      }
+      currentTeamLabel.textContent = appState.selectedTeam?.name || '-';
+    }
+
+    async function hydrateRostersFromState() {
+      const postseason = appState.postseason || {};
+      const myId = appState.selectedTeam?.id || postseason.my_team_id;
+      if (myId) {
+        await ensureTeamDetail(myId);
+      }
+
+      const phase = getCurrentPhase();
+      if (phase === 'playoffs') {
+        const series = findMySeries();
+        const opponentId = series
+          ? (series.home_court === appState.selectedTeam?.id ? series.road : series.home_court)
+          : null;
+        if (opponentId) {
+          await ensureTeamDetail(opponentId);
+        }
+      } else if (phase === 'play-in') {
+        const matchupInfo = findMyPlayInMatchup();
+        const matchup = matchupInfo?.matchup;
+        const myIdInMatchup = appState.selectedTeam?.id;
+        const opponentId = matchup
+          ? ((matchup.home?.team_id === myIdInMatchup) ? matchup.away?.team_id : matchup.home?.team_id)
+          : null;
+        if (opponentId) {
+          await ensureTeamDetail(opponentId);
+        }
       }
     }
 
@@ -461,7 +450,32 @@
       const res = await fetch('/api/postseason/state');
       const data = await res.json();
       appState.postseason = data;
+      syncSelectedTeamFromState();
+      await hydrateRostersFromState();
       renderPostseason();
+    }
+
+    async function bootstrapPostseason() {
+      bracketStatus.textContent = '포스트시즌 상태 확인 중...';
+      try {
+        await refreshPostseason();
+        const hasPostseason = appState.postseason?.playoffs || appState.postseason?.play_in;
+        if (!hasPostseason) {
+          const fallback = appState.selectedTeam || TEAMS[0];
+          appState.selectedTeam = fallback;
+          currentTeamLabel.textContent = fallback?.name || '-';
+          await fetch('/api/postseason/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+          await fetch('/api/postseason/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ my_team_id: fallback.id, use_random_field: true })
+          });
+          await refreshPostseason();
+        }
+        await Promise.all([refreshStats(), refreshNews()]);
+      } catch (err) {
+        bracketStatus.textContent = '브래킷 초기화 실패';
+      }
     }
 
     async function refreshStats() {
@@ -481,14 +495,107 @@
       renderNews();
     }
 
+    function getCurrentPhase() {
+      if (appState.postseason?.playoffs) return 'playoffs';
+      if (appState.postseason?.play_in) return 'play-in';
+      return 'none';
+    }
+
+    function describePlayInMatchup(key) {
+      if (key === 'seven_vs_eight') return '7위 vs 8위';
+      if (key === 'nine_vs_ten') return '9위 vs 10위';
+      if (key === 'final') return '플레이인 결정전';
+      return 'Play-In';
+    }
+
+    function findMyPlayInMatchup() {
+      const playIn = appState.postseason?.play_in;
+      const myId = appState.selectedTeam?.id;
+      if (!playIn || !myId) return null;
+      for (const [confKey, confState] of Object.entries(playIn)) {
+        const matchups = confState?.matchups || {};
+        for (const [key, matchup] of Object.entries(matchups)) {
+          if (!matchup) continue;
+          const home = matchup.home;
+          const away = matchup.away;
+          if ((home?.team_id === myId) || (away?.team_id === myId)) {
+            return { confKey, matchupKey: key, matchup };
+          }
+        }
+      }
+      return null;
+    }
+
+    function playInScore(matchup) {
+      if (!matchup?.result) return '경기 전';
+      const result = matchup.result;
+      const homeScore = result.home_score ?? '-';
+      const awayScore = result.away_score ?? '-';
+      return `${homeScore} - ${awayScore}`;
+    }
+
+    function playInEntryLabel(entry) {
+      if (!entry) return '미정';
+      const seed = entry.seed ? `${entry.seed}위 ` : '';
+      return `${seed}${getTeamName(entry.team_id)}`;
+    }
+
+    function renderPlayInBracket(playIn) {
+      bracketGrid.innerHTML = '';
+      if (!playIn) {
+        bracketGrid.innerHTML = '<p class="muted">플레이인 정보가 없습니다.</p>';
+        return;
+      }
+
+      Object.entries(playIn).forEach(([confKey, confState]) => {
+        const box = document.createElement('div');
+        box.className = 'bracket-conf';
+        box.innerHTML = `<div class="bracket-conf-title">${confKey === 'east' ? 'Eastern' : 'Western'} Play-In</div>`;
+        const matchups = confState.matchups || {};
+        ['seven_vs_eight', 'nine_vs_ten', 'final'].forEach(key => {
+          const matchup = matchups[key];
+          if (!matchup) return;
+          const card = document.createElement('div');
+          card.className = 'bracket-card';
+          card.innerHTML = `
+            <div class="bracket-matchup">${describePlayInMatchup(key)}${matchup.date ? ` · ${matchup.date}` : ''}</div>
+            <div class="bracket-teams">
+              <span>${playInEntryLabel(matchup.home)}</span>
+              <span class="score">${matchup.result ? (matchup.result.home_score ?? '-') : '-'}</span>
+            </div>
+            <div class="bracket-teams">
+              <span>${playInEntryLabel(matchup.away)}</span>
+              <span class="score">${matchup.result ? (matchup.result.away_score ?? '-') : '-'}</span>
+            </div>
+          `;
+          box.appendChild(card);
+        });
+        bracketGrid.appendChild(box);
+      });
+    }
+
     function renderPostseason() {
-      const playoffs = appState.postseason?.playoffs;
+      const postseason = appState.postseason || {};
+      const phase = getCurrentPhase();
+      const champion = postseason.champion;
+
+      if (phase === 'play-in') {
+        roundLabel.textContent = 'Play-In';
+        progressLabel.textContent = '플레이인 진행 중';
+        bracketStatus.textContent = '플레이인 매치업 대기';
+        renderHomeMatchup();
+        renderPlayInBracket(postseason.play_in);
+        return;
+      }
+
+      const playoffs = postseason.playoffs;
       if (!playoffs) {
         bracketStatus.textContent = '브래킷을 찾을 수 없습니다';
+        roundLabel.textContent = '-';
+        progressLabel.textContent = '대기';
         return;
       }
       const round = playoffs.current_round || 'Conference Quarterfinals';
-      const champion = appState.postseason?.champion;
       roundLabel.textContent = round;
       progressLabel.textContent = champion ? '종료' : '진행 중';
       bracketStatus.textContent = champion ? `${getTeamName(champion)} 우승!` : '진행 중 브래킷';
@@ -534,9 +641,30 @@
     }
 
     function renderHomeMatchup() {
+      const phase = getCurrentPhase();
+      const champion = appState.postseason?.champion;
+
+      if (phase === 'play-in') {
+        const info = findMyPlayInMatchup();
+        const matchup = info?.matchup;
+        const myTeam = appState.selectedTeam;
+        const homeEntry = matchup?.home;
+        const awayEntry = matchup?.away;
+        const opponentEntry = homeEntry?.team_id === myTeam?.id ? awayEntry : homeEntry;
+
+        homeMyTeam.textContent = getTeamName(myTeam?.id);
+        homeOpponent.textContent = opponentEntry?.team_id ? getTeamName(opponentEntry.team_id) : '상대 미정';
+        seriesMeta.textContent = matchup ? `${describePlayInMatchup(info.matchupKey)} · ${playInScore(matchup)}` : '시리즈 없음';
+        if (matchup?.result?.winner) {
+          seriesFooter.textContent = `${getTeamName(matchup.result.winner)} 진출 (${playInScore(matchup)})`;
+        } else {
+          seriesFooter.textContent = matchup ? '플레이인 경기 대기 중' : '매치업 없음';
+        }
+        return;
+      }
+
       const playoffs = appState.postseason?.playoffs;
       const series = findMySeries();
-      const champion = appState.postseason?.champion;
       if (!series || !playoffs) {
         homeMyTeam.textContent = appState.selectedTeam ? appState.selectedTeam.name : '팀 A';
         homeOpponent.textContent = '상대 미정';
@@ -666,7 +794,8 @@
       });
     }
 
-    function openTacticsScreen() {
+    async function openTacticsScreen() {
+      await hydrateRostersFromState();
       playoffMain.classList.add('hidden');
       tacticsScreen.classList.add('active');
       hydrateTacticsView();
@@ -690,8 +819,35 @@
       }
     }
 
-    function renderSeriesMeta() {
+    function resolveOpponentContext() {
+      const phase = getCurrentPhase();
+      if (phase === 'play-in') {
+        const info = findMyPlayInMatchup();
+        const opponentEntry = info?.matchup
+          ? (info.matchup.home?.team_id === appState.selectedTeam?.id ? info.matchup.away : info.matchup.home)
+          : null;
+        return { phase, opponentEntry, matchupKey: info?.matchupKey };
+      }
+
       const series = findMySeries();
+      if (!series) return { phase, opponentEntry: null, series: null };
+      const opponentId = series.home_court === appState.selectedTeam.id ? series.road : series.home_court;
+      const opponentEntry = series.home_court === appState.selectedTeam.id ? series.road_entry : series.home_entry;
+      return { phase, opponentEntry: opponentEntry ? { ...opponentEntry, team_id: opponentId } : null, series };
+    }
+
+    function renderSeriesMeta() {
+      const ctx = resolveOpponentContext();
+      if (ctx.phase === 'play-in') {
+        const label = ctx.matchupKey ? describePlayInMatchup(ctx.matchupKey) : '플레이인';
+        const opponentId = ctx.opponentEntry?.team_id;
+        tacticsSeriesMeta.textContent = opponentId
+          ? `${getTeamName(appState.selectedTeam?.id)} vs ${getTeamName(opponentId)} · ${label}`
+          : '플레이인 매치업 정보 없음';
+        return;
+      }
+
+      const series = ctx.series;
       if (!series) {
         tacticsSeriesMeta.textContent = '시리즈 매치업 정보 없음';
         return;
@@ -701,54 +857,57 @@
     }
 
     function renderOpponentPanel() {
-      const series = findMySeries();
-      const opponentId = series ? (series.home_court === appState.selectedTeam.id ? series.road : series.home_court) : null;
+      const ctx = resolveOpponentContext();
+      const opponentId = ctx.opponentEntry?.team_id;
       opponentName.textContent = opponentId ? getTeamName(opponentId) : '상대 팀 미정';
-      opponentSeed.textContent = series?.seedings?.[opponentId] ? `${series.seedings[opponentId]}위 시드` : '시드 정보 없음';
-      opponentStanding.textContent = series?.round || '정규시즌 순위 정보 없음';
-      opponentSchemes.textContent = '공격: PnR / 수비: Drop Coverage';
+      opponentSeed.textContent = ctx.opponentEntry?.seed ? `${ctx.opponentEntry.seed}위 시드` : '시드 정보 없음';
+      opponentStanding.textContent = ctx.phase === 'play-in' ? '플레이인' : (ctx.series?.round || '정규시즌 순위 정보 없음');
+      opponentSchemes.textContent = '공격/수비 전술 불러오는 중';
 
-      const roster = buildMockOpponentRoster(opponentId);
+      const roster = opponentId ? getCachedRoster(opponentId) : [];
       opponentRosterTable.innerHTML = '';
       const header = document.createElement('div');
       header.className = 'opponent-row opponent-header';
-      header.innerHTML = '<span>선수</span><span>GP</span><span>PTS</span><span>AST</span><span>REB</span><span>BLK</span>';
+      header.innerHTML = '<span>선수</span><span>POS</span><span>OVR</span><span>PTS</span><span>AST</span><span>REB</span>';
       opponentRosterTable.appendChild(header);
+      if (!roster.length) {
+        const empty = document.createElement('div');
+        empty.className = 'opponent-row';
+        empty.innerHTML = '<span colspan="6">로스터 정보를 불러오는 중입니다.</span>';
+        opponentRosterTable.appendChild(empty);
+        return;
+      }
       roster.forEach(player => {
         const row = document.createElement('div');
         row.className = 'opponent-row';
         row.innerHTML = `
           <span>${player.name}</span>
-          <span>${player.gp}</span>
-          <span>${player.pts}</span>
-          <span>${player.ast}</span>
-          <span>${player.reb}</span>
-          <span>${player.blk}</span>
+          <span>${player.pos || '-'}</span>
+          <span>${player.ovr != null ? Math.round(player.ovr) : '-'}</span>
+          <span>${player.pts?.toFixed ? player.pts.toFixed(1) : (player.pts ?? '-')}</span>
+          <span>${player.ast?.toFixed ? player.ast.toFixed(1) : (player.ast ?? '-')}</span>
+          <span>${player.reb?.toFixed ? player.reb.toFixed(1) : (player.reb ?? '-')}</span>
         `;
         opponentRosterTable.appendChild(row);
       });
     }
 
-    function buildMockOpponentRoster(opponentId) {
-      return mockOpponentPlayers.map((name, idx) => ({
-        name: opponentId ? `${name} (${opponentId})` : name,
-        gp: 78 - idx,
-        pts: (16 - idx * 0.4).toFixed(1),
-        ast: (5 - idx * 0.2).toFixed(1),
-        reb: (6 - idx * 0.15).toFixed(1),
-        blk: (1.1 - idx * 0.05).toFixed(1)
-      })).slice(0, 12);
-    }
-
     function renderStarterSelectors() {
       starterGrid.innerHTML = '';
+      const roster = getCachedRoster(appState.selectedTeam?.id) || [];
+      if (!roster.length) {
+        starterGrid.innerHTML = '<div class="muted">로스터 정보를 불러오는 중입니다.</div>';
+        return;
+      }
+      const defaultStarters = roster.slice(0, 5).map(p => p.player_id);
       for (let i = 0; i < 5; i++) {
         const wrapper = document.createElement('div');
         wrapper.className = 'starter-slot';
+        const options = roster.map(p => `<option value="${p.player_id}" ${defaultStarters[i] === p.player_id ? 'selected' : ''}>${playerLabel(p)}</option>`).join('');
         wrapper.innerHTML = `
           <div class="muted">스타터 ${i + 1}</div>
           <select class="wide-select">
-            ${mockMyPlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+            ${options}
           </select>
         `;
         starterGrid.appendChild(wrapper);
@@ -756,16 +915,18 @@
     }
 
     function renderRotationSelectors() {
+      const preselected = new Set(Array.from(rotationPool.querySelectorAll('input[type="checkbox"]:checked')).map(el => el.value));
       rotationPool.innerHTML = '';
+      const roster = getCachedRoster(appState.selectedTeam?.id) || [];
       const size = parseInt(rotationSizeSelect.value, 10) || 9;
       tacticsRotationLabel.textContent = `로테이션 ${size}명`;
-      mockMyPlayers.forEach((player, idx) => {
+      roster.forEach((player, idx) => {
         const row = document.createElement('label');
         row.className = 'rotation-row';
-        const checked = idx < size ? 'checked' : '';
+        const checked = preselected.size ? preselected.has(String(player.player_id)) : idx < size;
         row.innerHTML = `
-          <input type="checkbox" value="${player}" ${checked} />
-          <span>${player}</span>
+          <input type="checkbox" value="${player.player_id}" ${checked ? 'checked' : ''} />
+          <span>${playerLabel(player)}</span>
         `;
         row.querySelector('input').addEventListener('change', () => {
           renderMinutesBoard();
@@ -777,7 +938,15 @@
     }
 
     function getRotationPlayers() {
-      return Array.from(rotationPool.querySelectorAll('input[type="checkbox"]:checked')).map(el => el.value);
+      const roster = getCachedRoster(appState.selectedTeam?.id) || [];
+      const selectedIds = new Set(Array.from(rotationPool.querySelectorAll('input[type="checkbox"]:checked')).map(el => el.value));
+      return roster.filter(p => selectedIds.has(String(p.player_id)));
+    }
+
+    function getOpponentRoster() {
+      const ctx = resolveOpponentContext();
+      const opponentId = ctx.opponentEntry?.team_id;
+      return opponentId ? getCachedRoster(opponentId) : [];
     }
 
     function renderMinutesBoard() {
@@ -787,7 +956,7 @@
         const row = document.createElement('div');
         row.className = 'minute-row';
         row.innerHTML = `
-          <div class="minute-name">${player}</div>
+          <div class="minute-name">${playerLabel(player)}</div>
           <div class="minute-inputs">
             <label>출전시간 <input type="number" min="0" max="48" value="32" /></label>
             <label>역할 <input type="text" placeholder="예: 2nd Unit 핸들러" /></label>
@@ -799,16 +968,18 @@
 
     function renderMatchupList() {
       const rotationPlayers = getRotationPlayers();
+      const opponentRoster = getOpponentRoster();
       matchupList.innerHTML = '';
       rotationPlayers.forEach(player => {
         const row = document.createElement('div');
         row.className = 'matchup-row';
+        const opponentOptions = opponentRoster.map(p => `<option value="${p.player_id}">${playerLabel(p)}</option>`).join('');
         row.innerHTML = `
-          <div class="matchup-self">${player}</div>
+          <div class="matchup-self">${playerLabel(player)}</div>
           <div class="matchup-vs">↔</div>
           <select class="wide-select">
             <option value="">코트에 있을 때 누구를 막나요?</option>
-            ${mockOpponentPlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+            ${opponentOptions}
           </select>
         `;
         matchupList.appendChild(row);
@@ -817,16 +988,21 @@
 
     function renderMismatchDropdowns() {
       const rotationPlayers = getRotationPlayers();
-      mismatchAttacker.innerHTML = rotationPlayers.map(p => `<option value="${p}">${p}</option>`).join('');
-      mismatchTarget.innerHTML = mockOpponentPlayers.map(p => `<option value="${p}">${p}</option>`).join('');
+      const opponentRoster = getOpponentRoster();
+      mismatchAttacker.innerHTML = rotationPlayers.map(p => `<option value="${p.player_id}">${playerLabel(p)}</option>`).join('');
+      mismatchTarget.innerHTML = opponentRoster.map(p => `<option value="${p.player_id}">${playerLabel(p)}</option>`).join('');
     }
 
     function addDefenseRuleRow() {
+      const opponentRoster = getOpponentRoster();
+      const options = opponentRoster.length
+        ? opponentRoster.map(p => `<option value="${p.player_id}">${playerLabel(p)}</option>`).join('')
+        : '<option value="">상대 로스터 없음</option>';
       const row = document.createElement('div');
       row.className = 'defense-row';
       row.innerHTML = `
         <select class="wide-select">
-          ${mockOpponentPlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+          ${options}
         </select>
         <select class="wide-select">
           <option value="double">더블팀</option>
@@ -835,6 +1011,17 @@
         </select>
       `;
       defenseRules.appendChild(row);
+    }
+
+    async function advanceMyCurrentGame() {
+      const phase = getCurrentPhase();
+      const url = phase === 'play-in'
+        ? '/api/postseason/play-in/my-team-game'
+        : '/api/postseason/playoffs/advance-my-team-game';
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
     }
 
     rotationSizeSelect.addEventListener('change', () => {
@@ -846,8 +1033,8 @@
 
     btnAddDefenseRule.addEventListener('click', addDefenseRuleRow);
 
-    btnToggleTactics.addEventListener('click', () => {
-      openTacticsScreen();
+    btnToggleTactics.addEventListener('click', async () => {
+      await openTacticsScreen();
     });
 
     btnCloseTactics.addEventListener('click', () => {
@@ -858,7 +1045,7 @@
       btnPlayGame.disabled = true;
       btnPlayGame.textContent = '경기 진행 중...';
       try {
-        await fetch('/api/postseason/playoffs/advance-my-team-game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        await advanceMyCurrentGame();
         await refreshPostseason();
         await Promise.all([refreshStats(), refreshNews()]);
       } catch (err) {
@@ -868,8 +1055,6 @@
         btnPlayGame.textContent = '내 팀 경기 진행';
       }
     });
-
-    renderTeamCards();
   </script>
 </body>
 </html>
