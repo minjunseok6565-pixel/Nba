@@ -9,39 +9,8 @@
 </head>
 <body>
   <div id="app" class="playoff-app">
-    <!-- STEP 1: API 키 입력 -->
-    <section id="screen-api-key" class="step active">
-      <div class="center-wrapper">
-        <div class="logo-large">
-          <span class="logo">플레이오프 · <strong>LAB</strong></span>
-          <span class="badge">테스트 모드</span>
-        </div>
-        <p class="muted" style="font-size:0.9rem;margin-bottom:12px;">
-          Google Gemini API 키를 먼저 입력해주세요. 키는 브라우저에만 사용됩니다.
-        </p>
-        <label for="apiKeyInput" style="font-size:0.85rem;margin-bottom:4px;display:block;">Google API 키</label>
-        <input id="apiKeyInput" type="text" placeholder="예: AIza..." />
-        <div class="info-message" id="apiStatus"></div>
-        <div class="error-message" id="apiError"></div>
-        <div class="success-message" id="apiSuccess"></div>
-        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button id="btnValidateKey">API 키 확인 및 계속</button>
-          <button class="secondary small" type="button" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">
-            키 발급 페이지 열기
-          </button>
-        </div>
-        <div class="api-key-hint">
-          <div style="font-weight:500;margin-bottom:4px;font-size:0.82rem;">힌트</div>
-          <ul style="margin:0;padding-left:16px;font-size:0.78rem;">
-            <li>메인 모델: <code>gemini-3-pro-preview</code></li>
-            <li>테스트용 플레이오프 UI입니다.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- STEP 2: 팀 선택 -->
-    <section id="screen-team-select" class="step">
+    <!-- STEP 1: 팀 선택 -->
+    <section id="screen-team-select" class="step active">
       <div class="center-wrapper">
         <div class="logo-large" style="margin-bottom:8px;">
           <span class="logo">느바 시뮬 · <strong>팀 선택</strong></span>
@@ -235,14 +204,8 @@
 
   <script src="/static/state.js"></script>
   <script>
-    const screenApiKey = document.getElementById('screen-api-key');
     const screenTeamSelect = document.getElementById('screen-team-select');
     const screenMain = document.getElementById('screen-main');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const btnValidateKey = document.getElementById('btnValidateKey');
-    const apiStatus = document.getElementById('apiStatus');
-    const apiError = document.getElementById('apiError');
-    const apiSuccess = document.getElementById('apiSuccess');
     const teamGrid = document.getElementById('teamGrid');
     const chosenTeamLabel = document.getElementById('chosenTeamLabel');
     const btnTeamContinue = document.getElementById('btnTeamContinue');
@@ -264,7 +227,6 @@
     const btnPlayGame = document.getElementById('btnPlayGame');
 
     const appState = {
-      apiKey: null,
       selectedTeam: null,
       postseason: null,
       stats: null,
@@ -273,7 +235,6 @@
     };
 
     function showStep(name) {
-      screenApiKey.style.display = name === 'apiKey' ? 'block' : 'none';
       screenTeamSelect.style.display = name === 'team' ? 'block' : 'none';
       screenMain.style.display = name === 'main' ? 'block' : 'none';
     }
@@ -304,57 +265,6 @@
       chosenTeamLabel.textContent = team.name;
       btnTeamContinue.disabled = false;
     }
-
-    btnValidateKey.addEventListener('click', async () => {
-      const key = apiKeyInput.value.trim();
-      apiError.textContent = '';
-      apiSuccess.textContent = '';
-      apiStatus.textContent = '';
-
-      if (!key) {
-        apiError.textContent = 'Gemini API 키를 입력해주세요.';
-        return;
-      }
-      if (!/^AIza[0-9A-Za-z\-_]{10,}$/.test(key)) {
-        apiError.textContent = '키 형식이 올바르지 않습니다. AIza... 형태인지 확인하세요.';
-        return;
-      }
-
-      btnValidateKey.disabled = true;
-      const original = btnValidateKey.textContent;
-      btnValidateKey.textContent = '검증 중...';
-      apiStatus.textContent = 'API 키 확인 중입니다...';
-      try {
-        const res = await fetch('/api/validate-key', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey: key })
-        });
-        let detail = '';
-        try {
-          const body = await res.json();
-          detail = body?.detail || '';
-        } catch (e) {
-          detail = '';
-        }
-        if (!res.ok) {
-          const message = res.status === 401
-            ? '잘못된 API 키입니다. 키를 확인한 뒤 다시 시도해주세요.'
-            : (detail || 'API 키 검증에 실패했습니다.');
-          throw new Error(message);
-        }
-        apiStatus.textContent = '';
-        apiSuccess.textContent = 'API 키가 확인되었습니다! 팀 선택 화면으로 이동합니다.';
-        appState.apiKey = key;
-        showStep('team');
-      } catch (err) {
-        apiStatus.textContent = '';
-        apiError.textContent = err.message || 'API 키 검증 중 오류가 발생했습니다.';
-      } finally {
-        btnValidateKey.disabled = false;
-        btnValidateKey.textContent = original;
-      }
-    });
 
     btnTeamContinue.addEventListener('click', async () => {
       if (!appState.selectedTeam) return;
