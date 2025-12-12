@@ -1521,8 +1521,9 @@ function renderPlayoffBracket(playoffs) {
 function renderPlayoffStats() {
   if (!playoffStatsContainer) return;
   playoffStatsContainer.innerHTML = '';
-  const stats = appState.playoffStats || {};
-  const entries = Object.entries(stats);
+  const stats = appState.playoffStats;
+  const leaderMap = stats?.leaders ?? stats ?? {};
+  const entries = Object.entries(leaderMap);
   if (!entries.length) {
     playoffStatsContainer.innerHTML = '<p class="muted">플레이오프 스탯을 불러오는 중입니다...</p>';
     return;
@@ -1532,7 +1533,7 @@ function renderPlayoffStats() {
     const card = document.createElement('div');
     card.className = 'stat-card';
     card.innerHTML = `<div class="stat-title">${stat} 리더</div>`;
-    if (!leaders || !leaders.length) {
+    if (!leaders || !Array.isArray(leaders) || !leaders.length) {
       card.innerHTML += '<p class="muted">데이터 없음</p>';
     } else {
       const list = document.createElement('ul');
@@ -1574,7 +1575,9 @@ async function refreshPlayoffStats() {
   try {
     const res = await fetch('/api/stats/playoffs/leaders');
     if (res.ok) {
-      appState.playoffStats = await res.json();
+      const data = await res.json();
+      appState.playoffStats = data?.leaders ?? data ?? {};
+      appState.playoffStatsUpdatedAt = data?.updated_at;
     }
   } catch (err) {
     console.warn('플레이오프 스탯 로드 실패:', err);
@@ -1584,10 +1587,17 @@ async function refreshPlayoffStats() {
 
 async function refreshPlayoffNews() {
   try {
-    const res = await fetch('/api/news/playoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const res = await fetch('/api/news/playoffs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
     if (res.ok) {
       const data = await res.json();
       appState.playoffNews = data.items || [];
+    } else {
+      // e.g., 400 when postseason has not started yet
+      appState.playoffNews = [];
     }
   } catch (err) {
     console.warn('플레이오프 뉴스 로드 실패:', err);
