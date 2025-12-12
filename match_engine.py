@@ -82,7 +82,7 @@ class Team:
                 name=str(row.get("Name", f"Player {pid}")),
                 team_id=team_id,
                 pos=str(row.get("POS", "")),
-                overall=float(row.get("Overall", ratings.get("Overall", 75.0))),
+                overall=float(row.get("OVR", row.get("Overall", ratings.get("Overall", 75.0)))),
                 ratings=ratings,
             )
             all_players.append(p)
@@ -275,7 +275,9 @@ class Team:
             "Athleticism",
         )
 
-        if "Overall" in row and not pd.isna(row["Overall"]):
+        if "OVR" in row and not pd.isna(row["OVR"]):
+            r["Overall"] = float(row["OVR"])
+        elif "Overall" in row and not pd.isna(row["Overall"]):
             r["Overall"] = float(row["Overall"])
         else:
             r["Overall"] = sum(r.values()) / max(1, len(r))
@@ -972,6 +974,7 @@ class MatchEngine:
             "STL": round(s.get("STL", 0.0), 1),
             "BLK": round(s.get("BLK", 0.0), 1),
             "TOV": round(s.get("TOV", 0.0), 1),
+
             "FGM": int(s.get("FGM", 0.0)),
             "FGA": int(s.get("FGA", 0.0)),
             "3PM": int(s.get("3PM", 0.0)),
