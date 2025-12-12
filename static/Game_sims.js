@@ -211,6 +211,10 @@ async function requestSeasonReportForUserTeam() {
       homeLLMOutput.textContent = reportText || "(빈 리포트)";
     }
 
+    if (typeof handleSeasonReportGenerated === "function") {
+      handleSeasonReportGenerated(reportText);
+    }
+
     return reportText;
   } catch (err) {
     console.error("시즌 결산 리포트 생성 중 오류:", err);
@@ -266,6 +270,9 @@ async function simulateGameProgress() {
             // Home 탭 LLM 응답 박스에 표시
             homeLLMOutput.textContent = report;
             homeLLMOutput.classList.remove("muted");
+            if (typeof handleSeasonReportGenerated === "function") {
+              handleSeasonReportGenerated(report);
+            }
           } else {
             homeLLMOutput.textContent =
               "시즌 결산 리포트를 생성하지 못했습니다.";

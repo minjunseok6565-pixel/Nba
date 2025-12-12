@@ -800,9 +800,14 @@ def _build_playoff_seeds(field: Dict[str, Any], play_in: Dict[str, Any]) -> Dict
         seed7 = play_in_conf.get("seed7")
         seed8 = play_in_conf.get("seed8")
         if seed7:
-            conf_seeds[seed7.get("seed") or 7] = seed7
+            seed7_fixed = dict(seed7)
+            seed7_fixed["seed"] = 7
+            conf_seeds[7] = seed7_fixed
+
         if seed8:
-            conf_seeds[seed8.get("seed") or 8] = seed8
+            seed8_fixed = dict(seed8)
+            seed8_fixed["seed"] = 8
+            conf_seeds[8] = seed8_fixed
         seeds_for_bracket[conf_key] = conf_seeds
     return seeds_for_bracket
 
