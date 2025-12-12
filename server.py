@@ -15,12 +15,21 @@ from config import BASE_DIR, ROSTER_DF, ALL_TEAM_IDS
 from state import (
     GAME_STATE,
     _ensure_league_state,
-    initialize_master_schedule_if_needed,
+    get_current_date,
     get_schedule_summary,
+    initialize_master_schedule_if_needed,
 )
 from league_sim import simulate_single_game, advance_league_until
-from news_ai import refresh_weekly_news
-from stats_util import compute_league_leaders
+from playoffs import (
+    auto_advance_current_round,
+    advance_my_team_one_game,
+    build_postseason_field,
+    initialize_postseason,
+    play_my_team_play_in_game,
+    reset_postseason_state,
+)
+from news_ai import refresh_playoff_news, refresh_weekly_news
+from stats_util import compute_league_leaders, compute_playoff_league_leaders
 from team_utils import (
     get_conference_standings,
     get_team_cards,
@@ -83,6 +92,15 @@ class ChatMainRequest(BaseModel):
 class AdvanceLeagueRequest(BaseModel):
     target_date: str  # YYYY-MM-DD, 이 날짜까지 리그를 자동 진행
     user_team_id: Optional[str] = None
+
+
+class PostseasonSetupRequest(BaseModel):
+    my_team_id: str
+    use_random_field: bool = False
+
+
+class EmptyRequest(BaseModel):
+    pass
 
 
 class WeeklyNewsRequest(BaseModel):
@@ -176,7 +194,14 @@ async def api_stats_leaders():
     # UI to break. Normalize here so the client always receives
     # `{ leaders: { PTS: [...], AST: [...], ... }, updated_at: <iso date> }`.
     leaders = compute_league_leaders()
-    current_date = GAME_STATE.get("current_date")
+    current_date = get_current_date()
+    return {"leaders": leaders, "updated_at": current_date}
+
+
+@app.get("/api/stats/playoffs/leaders")
+async def api_playoff_stats_leaders():
+    leaders = compute_playoff_league_leaders()
+    current_date = get_current_date()
     return {"leaders": leaders, "updated_at": current_date}
 
 
@@ -196,6 +221,58 @@ async def api_team_detail(team_id: str):
         return get_team_detail(team_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# -------------------------------------------------------------------------
+# 플레이-인 / 플레이오프
+# -------------------------------------------------------------------------
+
+
+@app.get("/api/postseason/field")
+async def api_postseason_field():
+    return build_postseason_field()
+
+
+@app.get("/api/postseason/state")
+async def api_postseason_state():
+    return GAME_STATE.get("postseason") or {}
+
+
+@app.post("/api/postseason/reset")
+async def api_postseason_reset():
+    return reset_postseason_state()
+
+
+@app.post("/api/postseason/setup")
+async def api_postseason_setup(req: PostseasonSetupRequest):
+    try:
+        return initialize_postseason(req.my_team_id, use_random_field=req.use_random_field)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/postseason/play-in/my-team-game")
+async def api_play_in_my_team_game(req: EmptyRequest):
+    try:
+        return play_my_team_play_in_game()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/postseason/playoffs/advance-my-team-game")
+async def api_playoffs_advance_my_team_game(req: EmptyRequest):
+    try:
+        return advance_my_team_one_game()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/postseason/playoffs/auto-advance-round")
+async def api_playoffs_auto_advance_round(req: EmptyRequest):
+    try:
+        return auto_advance_current_round()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # -------------------------------------------------------------------------
@@ -221,6 +298,16 @@ async def api_news_week(req: WeeklyNewsRequest):
         return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Weekly news generation failed: {e}")
+
+
+@app.post("/api/news/playoffs")
+async def api_playoff_news(req: EmptyRequest):
+    try:
+        return refresh_playoff_news()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Playoff news generation failed: {e}")
 
 
 @app.post("/api/season-report")

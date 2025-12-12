@@ -38,7 +38,12 @@ GAME_STATE: Dict[str, Any] = {
             "last_generated_week_start": None,
             "items": [],
         },
+        "playoff_news": {
+            "series_game_counts": {},
+            "items": [],
+        },
     },
+    "postseason": {},  # 플레이-인/플레이오프 시뮬레이션 결과 캐시
     "league": {
         "season_year": None,
         "season_start": None,  # YYYY-MM-DD
@@ -58,6 +63,33 @@ GAME_STATE: Dict[str, Any] = {
     "players": {},    # 선수 메타 정보
     "transactions": [],  # 트레이드 등 기록
 }
+
+
+def get_current_date() -> Optional[str]:
+    """Return the league's current in-game date, keeping legacy mirrors in sync."""
+    league = _ensure_league_state()
+    current = league.get("current_date")
+    legacy_current = GAME_STATE.get("current_date")
+
+    if current:
+        GAME_STATE["current_date"] = current
+        return current
+
+    if legacy_current:
+        league["current_date"] = legacy_current
+        return legacy_current
+
+    return None
+
+
+def set_current_date(date_str: Optional[str]) -> None:
+    """Update the league's current date and mirror it at the legacy location."""
+    league = _ensure_league_state()
+    league["current_date"] = date_str
+    if date_str is None:
+        GAME_STATE.pop("current_date", None)
+    else:
+        GAME_STATE["current_date"] = date_str
 
 
 def _ensure_schedule_team(team_id: str) -> Dict[str, Any]:
@@ -267,7 +299,7 @@ def _build_master_schedule(season_year: int) -> None:
     league["season_start"] = season_start.isoformat()
     trade_deadline_date = date(season_year + 1, 2, 5)
     league["trade_rules"]["trade_deadline"] = trade_deadline_date.isoformat()
-    league["current_date"] = None
+    set_current_date(None)
     league["last_gm_tick_date"] = None
 
 
@@ -426,6 +458,49 @@ def _update_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]
                 except (TypeError, ValueError):
                     continue
 
+
+
+def _update_playoff_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]) -> None:
+    """박스스코어를 포스트시즌 누적 player_stats에 반영한다."""
+    if not boxscore:
+        return
+
+    postseason = GAME_STATE.setdefault("postseason", {})
+    playoff_stats = postseason.setdefault("playoff_player_stats", {})
+    track_stats = ["PTS", "AST", "REB", "3PM"]
+
+    for team_rows in boxscore.values():
+        if not isinstance(team_rows, list):
+            continue
+        for row in team_rows:
+            if not isinstance(row, dict):
+                continue
+            player_id = row.get("PlayerID")
+            if player_id is None:
+                continue
+            stat_entry = playoff_stats.setdefault(
+                player_id,
+                {
+                    "player_id": player_id,
+                    "name": row.get("Name"),
+                    "team_id": row.get("Team"),
+                    "games": 0,
+                    "totals": {s: 0.0 for s in track_stats},
+                },
+            )
+
+            stat_entry["name"] = row.get("Name", stat_entry.get("name"))
+            stat_entry["team_id"] = row.get("Team", stat_entry.get("team_id"))
+            stat_entry["games"] = stat_entry.get("games", 0) + 1
+
+            totals = stat_entry.setdefault("totals", {s: 0.0 for s in track_stats})
+            for stat_name in track_stats:
+                try:
+                    totals[stat_name] = float(totals.get(stat_name, 0.0)) + float(
+                        row.get(stat_name, 0) or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
 
 
 def get_schedule_summary() -> Dict[str, Any]:

@@ -22,7 +22,11 @@ let appState = {
   // 어떤 팀의 퍼스트 메시지를 이미 보여줬는지 기록
   firstMessageShownTeams: {},
   // 팀별 전술 상태 저장
-  tacticsByTeam: {}
+  tacticsByTeam: {},
+  // 포스트시즌 진행 상태
+  postseason: null,
+  // 시즌 결산 생성 여부
+  seasonReportReady: false
 };
 
 // 간단한 팀 데이터 (프런트 전용 메타)

@@ -2,6 +2,7 @@
 const screenApiKey = document.getElementById('screen-api-key');
 const screenTeamSelect = document.getElementById('screen-team-select');
 const screenMain = document.getElementById('screen-main');
+const screenPlayoff = document.getElementById('screen-playoff');
 
 const apiKeyInput = document.getElementById('apiKeyInput');
 const btnApiKeyNext = document.getElementById('btnValidateKey');
@@ -13,7 +14,7 @@ const btnTeamContinue = document.getElementById('btnTeamContinue');
 const currentTeamLabel = document.getElementById('currentTeamLabel');
 const chosenTeamLabel = document.getElementById('chosenTeamLabel');
 
-const navTabs = document.querySelectorAll('.nav-tab');
+const navTabs = document.querySelectorAll('#screen-main .nav-tab');
 const tabScreens = {
   home: document.getElementById('tab-home'),
   tactics: document.getElementById('tab-tactics'),
@@ -25,7 +26,33 @@ const tabScreens = {
   news: document.getElementById('tab-news')
 };
 
+const playoffNavTabs = document.querySelectorAll('#screen-playoff .nav-tab');
+const playoffTabScreens = {
+  home: document.getElementById('playoff-tab-home'),
+  bracket: document.getElementById('playoff-tab-bracket'),
+  stats: document.getElementById('playoff-tab-stats'),
+  news: document.getElementById('playoff-tab-news')
+};
+
 const tabTitle = document.getElementById('tabTitle');
+const playoffTabTitle = document.getElementById('playoffTabTitle');
+const playoffBracketStatus = document.getElementById('playoffBracketStatus');
+const playoffCurrentTeamLabel = document.getElementById('playoffCurrentTeamLabel');
+const playoffStageLabel = document.getElementById('playoffStageLabel');
+const playoffRoundLabel = document.getElementById('playoffRoundLabel');
+const playoffProgressLabel = document.getElementById('playoffProgressLabel');
+const playoffHomeStage = document.getElementById('playoffHomeStage');
+const playoffHomeMyTeam = document.getElementById('playoffHomeMyTeam');
+const playoffHomeOpponent = document.getElementById('playoffHomeOpponent');
+const playoffSeriesMeta = document.getElementById('playoffSeriesMeta');
+const playoffSeriesFooter = document.getElementById('playoffSeriesFooter');
+const playoffBracketGrid = document.getElementById('playoffBracketGrid');
+const playoffStatsContainer = document.getElementById('playoffStatsContainer');
+const playoffNewsList = document.getElementById('playoffNewsList');
+const postseasonCallout = document.getElementById('postseasonCallout');
+const btnGoToPlayoff = document.getElementById('btnGoToPlayoff');
+const btnPlayoffGame = document.getElementById('btnPlayoffGame');
+const btnPlayInGame = document.getElementById('btnPlayInGame');
 
 // 메인 탭 요소
 const homeLog = document.getElementById('homeLog');
@@ -94,6 +121,9 @@ function showScreen(name) {
   screenApiKey.style.display = name === 'apiKey' ? 'block' : 'none';
   screenTeamSelect.style.display = name === 'teamSelect' ? 'block' : 'none';
   screenMain.style.display = name === 'main' ? 'block' : 'none';
+  if (screenPlayoff) {
+    screenPlayoff.style.display = name === 'playoff' ? 'block' : 'none';
+  }
 }
 
 // API 키 입력 단계 버튼
@@ -188,12 +218,23 @@ function selectTeam(teamId) {
   appState.rosters = {};
   appState.chatHistory = [];
   appState.firstMessageShownTeams = appState.firstMessageShownTeams || {};
+  appState.postseason = null;
+  appState.seasonReportReady = false;
+  if (postseasonCallout) {
+    postseasonCallout.style.display = 'none';
+  }
 
   // 팀별 전술 기본값 준비
   getOrCreateTacticsForTeam(team.id);
 
   // 선택 시점에 로스터 요약을 미리 불러오기(서버에서)
   loadRosterForTeam(team.id);
+}
+
+function getTeamName(teamId) {
+  if (!teamId) return '-';
+  const t = TEAMS.find(x => x.id === teamId);
+  return t ? t.name : teamId;
 }
 
 // 팀 선택 완료 버튼
@@ -231,6 +272,13 @@ navTabs.forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
     switchTab(tab);
+  });
+});
+
+playoffNavTabs.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.playoffTab;
+    switchPlayoffTab(tab);
   });
 });
 
@@ -290,6 +338,24 @@ function switchTab(tab) {
     renderNews();
   } else if (tab === 'tactics') {
     renderTacticsTab();
+  }
+}
+
+function switchPlayoffTab(tab) {
+  Object.keys(playoffTabScreens).forEach(key => {
+    playoffTabScreens[key].style.display = key === tab ? 'block' : 'none';
+  });
+
+  playoffNavTabs.forEach(btn => {
+    if (btn.dataset.playoffTab === tab) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  if (playoffTabTitle) {
+    playoffTabTitle.textContent = tab.charAt(0).toUpperCase() + tab.slice(1);
   }
 }
 
@@ -1176,8 +1242,439 @@ function renderSidebarRecentGames() {
   });
 }
 
+function updatePostseasonCallout() {
+  if (!postseasonCallout) return;
+  postseasonCallout.style.display = appState.seasonReportReady ? 'block' : 'none';
+}
+
+function handleSeasonReportGenerated(reportText) {
+  appState.seasonReportReady = true;
+  appState.seasonReportText = reportText;
+  updatePostseasonCallout();
+}
+
+async function startPostseasonFlow() {
+  if (!appState.selectedTeam) {
+    alert('팀을 먼저 선택하세요.');
+    return;
+  }
+
+  try {
+    await fetch('/api/postseason/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    await fetch('/api/postseason/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ my_team_id: appState.selectedTeam.id, use_random_field: false })
+    });
+  } catch (err) {
+    console.error('포스트시즌 초기화 실패:', err);
+    alert('포스트시즌을 준비하는 중 오류가 발생했습니다.');
+    return;
+  }
+
+  await refreshPostseasonState();
+  await Promise.all([refreshPlayoffStats(), refreshPlayoffNews()]);
+  showScreen('playoff');
+  switchPlayoffTab('home');
+}
+
+function findMyPlayInConf(playInState) {
+  if (!playInState || !appState.selectedTeam) return null;
+  const myId = appState.selectedTeam.id;
+  for (const [confKey, confState] of Object.entries(playInState)) {
+    const participants = confState.participants || {};
+    if (Object.values(participants).some(p => p && p.team_id === myId)) {
+      return { confKey, confState };
+    }
+  }
+  return null;
+}
+
+function describePlayInResult(matchup) {
+  if (!matchup) return '매치업 없음';
+  const home = matchup.home?.team_id;
+  const away = matchup.away?.team_id;
+  const label = `${getTeamName(home)} vs ${getTeamName(away)}`;
+  if (!matchup.result) return label;
+  return `${label} · ${getTeamName(matchup.result.winner)} 승`;
+}
+
+function nextPlayInMatchup(confState) {
+  if (!confState) return null;
+  const myId = appState.selectedTeam?.id;
+  const order = ['seven_vs_eight', 'nine_vs_ten', 'final'];
+  for (const key of order) {
+    const matchup = confState.matchups?.[key];
+    if (!matchup || matchup.result) continue;
+    const homeId = matchup.home?.team_id;
+    const awayId = matchup.away?.team_id;
+    if (myId && (homeId === myId || awayId === myId)) {
+      return matchup;
+    }
+  }
+  return null;
+}
+
+function renderPlayInStage(playInState) {
+  const myInfo = findMyPlayInConf(playInState);
+  playoffStageLabel.textContent = 'Play-In';
+  playoffHomeStage.textContent = '플레이인 토너먼트';
+  playoffRoundLabel.textContent = 'Play-In';
+  playoffProgressLabel.textContent = appState.postseason?.playoffs ? '완료' : '진행 중';
+
+  const matchup = myInfo ? nextPlayInMatchup(myInfo.confState) : null;
+  const matchups = myInfo?.confState?.matchups || {};
+  const stageFooter = [];
+  ['seven_vs_eight', 'nine_vs_ten', 'final'].forEach(key => {
+    if (matchups[key]) {
+      stageFooter.push(describePlayInResult(matchups[key]));
+    }
+  });
+
+  playoffHomeMyTeam.textContent = getTeamName(appState.selectedTeam?.id);
+  playoffHomeOpponent.textContent = matchup ? getTeamName(matchup.home?.team_id === appState.selectedTeam?.id ? matchup.away?.team_id : matchup.home?.team_id) : '-';
+  playoffSeriesMeta.textContent = matchup ? '플레이인 경기 준비' : '완료된 플레이인';
+  playoffSeriesFooter.textContent = stageFooter.join(' · ') || '플레이인 정보를 불러오는 중입니다.';
+  playoffBracketStatus.textContent = '플레이인 진행 중';
+
+  if (btnPlayInGame) {
+    btnPlayInGame.style.display = matchup ? 'inline-block' : 'none';
+    btnPlayInGame.disabled = !matchup;
+  }
+  if (btnPlayoffGame) {
+    btnPlayoffGame.style.display = 'none';
+  }
+
+  renderPlayInBracket(playInState);
+}
+
+function renderPlayInBracket(playInState) {
+  if (!playoffBracketGrid) return;
+  playoffBracketGrid.innerHTML = '';
+
+  ['east', 'west'].forEach(confKey => {
+    const confState = playInState?.[confKey];
+    if (!confState) return;
+    const confBox = document.createElement('div');
+    confBox.className = 'bracket-conf';
+    confBox.innerHTML = `<div class="bracket-conf-title">${confKey === 'east' ? 'Eastern' : 'Western'} Play-In</div>`;
+
+    const matchups = confState.matchups || {};
+    ['seven_vs_eight', 'nine_vs_ten', 'final'].forEach(key => {
+      const matchup = matchups[key];
+      if (!matchup || (!matchup.home && !matchup.away)) return;
+      const card = document.createElement('div');
+      card.className = 'bracket-card';
+      card.innerHTML = `
+        <div class="bracket-matchup">${key.replace(/_/g, ' ').toUpperCase()}</div>
+        <div class="bracket-teams">
+          <span>${getTeamName(matchup.home?.team_id)}</span>
+          <span class="score">${matchup.result?.winner === matchup.home?.team_id ? 'W' : ''}</span>
+        </div>
+        <div class="bracket-teams">
+          <span>${getTeamName(matchup.away?.team_id)}</span>
+          <span class="score">${matchup.result?.winner === matchup.away?.team_id ? 'W' : ''}</span>
+        </div>
+      `;
+      confBox.appendChild(card);
+    });
+
+    playoffBracketGrid.appendChild(confBox);
+  });
+}
+
+function collectRoundSeries(playoffs, roundName) {
+  const bracket = playoffs?.bracket || {};
+  if (roundName === 'Conference Quarterfinals') {
+    return [...(bracket.east?.quarterfinals || []), ...(bracket.west?.quarterfinals || [])];
+  }
+  if (roundName === 'Conference Semifinals') {
+    return [...(bracket.east?.semifinals || []), ...(bracket.west?.semifinals || [])];
+  }
+  if (roundName === 'Conference Finals') {
+    const east = bracket.east?.finals ? [bracket.east.finals] : [];
+    const west = bracket.west?.finals ? [bracket.west.finals] : [];
+    return [...east, ...west];
+  }
+  if (roundName === 'NBA Finals') {
+    return bracket.finals ? [bracket.finals] : [];
+  }
+  return [];
+}
+
+function findMySeries(playoffs) {
+  if (!playoffs || !appState.selectedTeam) return null;
+  const round = playoffs.current_round || 'Conference Quarterfinals';
+  const seriesList = collectRoundSeries(playoffs, round) || [];
+  return seriesList.find(s => s && (s.home_court === appState.selectedTeam.id || s.road === appState.selectedTeam.id));
+}
+
+function seriesScore(series) {
+  if (!series) return '0 - 0';
+  const wins = series.wins || {};
+  const homeWins = wins[series.home_court] || 0;
+  const roadWins = wins[series.road] || 0;
+  return `${homeWins} - ${roadWins}`;
+}
+
+function renderPlayoffStage(playoffs) {
+  const champion = appState.postseason?.champion;
+  const round = playoffs?.current_round || 'Conference Quarterfinals';
+  playoffStageLabel.textContent = 'Playoffs';
+  playoffRoundLabel.textContent = round;
+  playoffProgressLabel.textContent = champion ? '종료' : '진행 중';
+  playoffBracketStatus.textContent = champion ? `${getTeamName(champion)} 우승!` : '진행 중 브래킷';
+
+  const series = findMySeries(playoffs);
+  if (!series) {
+    playoffHomeMyTeam.textContent = getTeamName(appState.selectedTeam?.id);
+    playoffHomeOpponent.textContent = '-';
+    playoffSeriesMeta.textContent = champion ? '포스트시즌 종료' : '현재 매치업 없음';
+    playoffSeriesFooter.textContent = champion ? `${getTeamName(champion)} 우승` : '다음 매치업을 기다리는 중';
+    if (btnPlayoffGame) btnPlayoffGame.style.display = 'none';
+  } else {
+    const opponentId = series.home_court === appState.selectedTeam.id ? series.road : series.home_court;
+    playoffHomeMyTeam.textContent = getTeamName(appState.selectedTeam.id);
+    playoffHomeOpponent.textContent = getTeamName(opponentId);
+    playoffSeriesMeta.textContent = `${series.round} · ${series.matchup} · ${seriesScore(series)}`;
+    playoffSeriesFooter.textContent = series.winner
+      ? `${getTeamName(series.winner)} 승리 (${seriesScore(series)})`
+      : `${getTeamName(appState.selectedTeam.id)} 경기 진행 가능`;
+    if (btnPlayoffGame) {
+      btnPlayoffGame.style.display = series.winner || champion ? 'none' : 'inline-block';
+      btnPlayoffGame.disabled = !!series.winner;
+    }
+  }
+
+  if (btnPlayInGame) {
+    btnPlayInGame.style.display = 'none';
+  }
+
+  renderPlayoffBracket(playoffs);
+}
+
+function renderPlayoffBracket(playoffs) {
+  if (!playoffBracketGrid) return;
+  if (!playoffs) {
+    playoffBracketGrid.innerHTML = '<p class="muted">브래킷 정보가 없습니다.</p>';
+    return;
+  }
+  const bracket = playoffs.bracket || {};
+  playoffBracketGrid.innerHTML = '';
+  ['east', 'west'].forEach(conf => {
+    const confBox = document.createElement('div');
+    confBox.className = 'bracket-conf';
+    confBox.innerHTML = `<div class="bracket-conf-title">${conf === 'east' ? 'Eastern' : 'Western'} Conference</div>`;
+    const rounds = [
+      { key: 'quarterfinals', label: 'Quarterfinals' },
+      { key: 'semifinals', label: 'Semifinals' },
+      { key: 'finals', label: 'Conference Finals' },
+    ];
+    rounds.forEach(r => {
+      const column = document.createElement('div');
+      column.className = 'bracket-column';
+      column.innerHTML = `<div class="bracket-round-title">${r.label}</div>`;
+      const seriesList = (bracket[conf] && bracket[conf][r.key]) ? bracket[conf][r.key] : [];
+      (Array.isArray(seriesList) ? seriesList : [seriesList]).filter(Boolean).forEach(series => {
+        const card = document.createElement('div');
+        card.className = 'bracket-card';
+        card.innerHTML = `
+          <div class="bracket-matchup">${series.matchup || ''}</div>
+          <div class="bracket-teams">
+            <span>${getTeamName(series.home_court)}</span>
+            <span class="score">${series.wins?.[series.home_court] || 0}</span>
+          </div>
+          <div class="bracket-teams">
+            <span>${getTeamName(series.road)}</span>
+            <span class="score">${series.wins?.[series.road] || 0}</span>
+          </div>
+        `;
+        column.appendChild(card);
+      });
+      confBox.appendChild(column);
+    });
+    playoffBracketGrid.appendChild(confBox);
+  });
+
+  if (bracket.finals) {
+    const finals = document.createElement('div');
+    finals.className = 'bracket-finals';
+    const series = bracket.finals;
+    finals.innerHTML = `
+      <div class="bracket-final-title">NBA Finals</div>
+      <div class="bracket-card">
+        <div class="bracket-matchup">${series.matchup || 'FINALS'}</div>
+        <div class="bracket-teams">
+          <span>${getTeamName(series.home_court)}</span>
+          <span class="score">${series.wins?.[series.home_court] || 0}</span>
+        </div>
+        <div class="bracket-teams">
+          <span>${getTeamName(series.road)}</span>
+          <span class="score">${series.wins?.[series.road] || 0}</span>
+        </div>
+      </div>
+    `;
+    playoffBracketGrid.appendChild(finals);
+  }
+}
+
+function renderPlayoffStats() {
+  if (!playoffStatsContainer) return;
+  playoffStatsContainer.innerHTML = '';
+  const stats = appState.playoffStats;
+  const leaderMap = stats?.leaders ?? stats ?? {};
+  const entries = Object.entries(leaderMap);
+  if (!entries.length) {
+    playoffStatsContainer.innerHTML = '<p class="muted">플레이오프 스탯을 불러오는 중입니다...</p>';
+    return;
+  }
+
+  entries.forEach(([stat, leaders]) => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.innerHTML = `<div class="stat-title">${stat} 리더</div>`;
+    if (!leaders || !Array.isArray(leaders) || !leaders.length) {
+      card.innerHTML += '<p class="muted">데이터 없음</p>';
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'stat-list';
+      leaders.forEach(row => {
+        const li = document.createElement('li');
+        const value = row[stat] != null && typeof row[stat] === 'number' ? row[stat].toFixed(1) : row[stat] ?? '-';
+        li.innerHTML = `<span>${row.name || '익명'} (${row.team_id || '-'})</span><span class="value">${value}</span>`;
+        list.appendChild(li);
+      });
+      card.appendChild(list);
+    }
+    playoffStatsContainer.appendChild(card);
+  });
+}
+
+function renderPlayoffNews() {
+  if (!playoffNewsList) return;
+  const news = appState.playoffNews || [];
+  playoffNewsList.innerHTML = '';
+  if (!news.length) {
+    playoffNewsList.innerHTML = '<div class="muted">플레이오프 뉴스가 없습니다.</div>';
+    return;
+  }
+  news.forEach(item => {
+    const div = document.createElement('div');
+    div.innerHTML = `<strong>[${item.date || '-'}] ${item.title || '제목 없음'}</strong><br>${item.summary || ''}`;
+    playoffNewsList.appendChild(div);
+  });
+}
+
+async function refreshPostseasonState() {
+  const res = await fetch('/api/postseason/state');
+  appState.postseason = await res.json();
+  renderPostseasonViews();
+}
+
+async function refreshPlayoffStats() {
+  try {
+    const res = await fetch('/api/stats/playoffs/leaders');
+    if (res.ok) {
+      const data = await res.json();
+      appState.playoffStats = data?.leaders ?? data ?? {};
+      appState.playoffStatsUpdatedAt = data?.updated_at;
+    }
+  } catch (err) {
+    console.warn('플레이오프 스탯 로드 실패:', err);
+  }
+  renderPlayoffStats();
+}
+
+async function refreshPlayoffNews() {
+  try {
+    const res = await fetch('/api/news/playoffs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      appState.playoffNews = data.items || [];
+    } else {
+      // e.g., 400 when postseason has not started yet
+      appState.playoffNews = [];
+    }
+  } catch (err) {
+    console.warn('플레이오프 뉴스 로드 실패:', err);
+    appState.playoffNews = [];
+  }
+  renderPlayoffNews();
+}
+
+function renderPostseasonViews() {
+  if (!appState.postseason) return;
+  playoffCurrentTeamLabel.textContent = getTeamName(appState.selectedTeam?.id);
+  const playoffs = appState.postseason.playoffs;
+  const playIn = appState.postseason.play_in;
+
+  if (playoffs) {
+    renderPlayoffStage(playoffs);
+  } else if (playIn) {
+    renderPlayInStage(playIn);
+  } else {
+    playoffBracketStatus.textContent = '포스트시즌 정보 없음';
+  }
+}
+
+async function handlePlayoffGame() {
+  if (!btnPlayoffGame) return;
+  btnPlayoffGame.disabled = true;
+  btnPlayoffGame.textContent = '경기 진행 중...';
+  try {
+    await fetch('/api/postseason/playoffs/advance-my-team-game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    await refreshPostseasonState();
+    await Promise.all([refreshPlayoffStats(), refreshPlayoffNews()]);
+  } catch (err) {
+    alert('경기 진행에 실패했습니다. 콘솔을 확인하세요.');
+  } finally {
+    btnPlayoffGame.disabled = false;
+    btnPlayoffGame.textContent = '플레이오프 경기 진행';
+  }
+}
+
+async function handlePlayInGame() {
+  if (!btnPlayInGame) return;
+  btnPlayInGame.disabled = true;
+  btnPlayInGame.textContent = '경기 진행 중...';
+  try {
+    await fetch('/api/postseason/play-in/my-team-game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    await refreshPostseasonState();
+    await Promise.all([refreshPlayoffStats(), refreshPlayoffNews()]);
+  } catch (err) {
+    alert('플레이인 경기 진행에 실패했습니다. 콘솔을 확인하세요.');
+  } finally {
+    btnPlayInGame.disabled = false;
+    btnPlayInGame.textContent = '플레이인 경기 진행';
+  }
+}
+
 
 // 초기화
 
 renderTeamCards();
 showScreen('apiKey');
+
+updatePostseasonCallout();
+
+if (btnGoToPlayoff) {
+  btnGoToPlayoff.addEventListener('click', () => {
+    startPostseasonFlow();
+  });
+}
+
+if (btnPlayoffGame) {
+  btnPlayoffGame.addEventListener('click', () => {
+    handlePlayoffGame();
+  });
+}
+
+if (btnPlayInGame) {
+  btnPlayInGame.addEventListener('click', () => {
+    handlePlayInGame();
+  });
+}
