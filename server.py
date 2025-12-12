@@ -15,8 +15,9 @@ from config import BASE_DIR, ROSTER_DF, ALL_TEAM_IDS
 from state import (
     GAME_STATE,
     _ensure_league_state,
-    initialize_master_schedule_if_needed,
+    get_current_date,
     get_schedule_summary,
+    initialize_master_schedule_if_needed,
 )
 from league_sim import simulate_single_game, advance_league_until
 from playoffs import (
@@ -192,14 +193,14 @@ async def api_stats_leaders():
     # UI to break. Normalize here so the client always receives
     # `{ leaders: { PTS: [...], AST: [...], ... }, updated_at: <iso date> }`.
     leaders = compute_league_leaders()
-    current_date = GAME_STATE.get("current_date")
+    current_date = get_current_date()
     return {"leaders": leaders, "updated_at": current_date}
 
 
 @app.get("/api/stats/playoffs/leaders")
 async def api_playoff_stats_leaders():
     leaders = compute_playoff_league_leaders()
-    current_date = GAME_STATE.get("current_date")
+    current_date = get_current_date()
     return {"leaders": leaders, "updated_at": current_date}
 
 

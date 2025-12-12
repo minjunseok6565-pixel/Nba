@@ -65,6 +65,33 @@ GAME_STATE: Dict[str, Any] = {
 }
 
 
+def get_current_date() -> Optional[str]:
+    """Return the league's current in-game date, keeping legacy mirrors in sync."""
+    league = _ensure_league_state()
+    current = league.get("current_date")
+    legacy_current = GAME_STATE.get("current_date")
+
+    if current:
+        GAME_STATE["current_date"] = current
+        return current
+
+    if legacy_current:
+        league["current_date"] = legacy_current
+        return legacy_current
+
+    return None
+
+
+def set_current_date(date_str: Optional[str]) -> None:
+    """Update the league's current date and mirror it at the legacy location."""
+    league = _ensure_league_state()
+    league["current_date"] = date_str
+    if date_str is None:
+        GAME_STATE.pop("current_date", None)
+    else:
+        GAME_STATE["current_date"] = date_str
+
+
 def _ensure_schedule_team(team_id: str) -> Dict[str, Any]:
     """GAME_STATE.cached_views.schedule에 팀 엔트리가 없으면 생성."""
     schedule = GAME_STATE["cached_views"]["schedule"]
@@ -272,7 +299,7 @@ def _build_master_schedule(season_year: int) -> None:
     league["season_start"] = season_start.isoformat()
     trade_deadline_date = date(season_year + 1, 2, 5)
     league["trade_rules"]["trade_deadline"] = trade_deadline_date.isoformat()
-    league["current_date"] = None
+    set_current_date(None)
     league["last_gm_tick_date"] = None
 
 
