@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import random
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from config import ROSTER_DF
+from config import ROSTER_DF, TEAM_TO_CONF_DIV
 from match_engine import MatchEngine, Team
 from state import (
     GAME_STATE,
@@ -132,6 +133,77 @@ def _seed_entry(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _random_seed_entry(team_id: str, seed: Optional[int], conf_key: str) -> Dict[str, Any]:
+    info = TEAM_TO_CONF_DIV.get(team_id, {})
+    division = info.get("division")
+    # 높은 시드가 더 높은 승률을 갖도록 약간의 편차를 둔다.
+    base_win_pct = 0.78 - max(seed - 1, 0) * 0.035 if seed else 0.42
+    win_pct = max(0.35, min(0.78, base_win_pct + random.uniform(-0.01, 0.02)))
+    wins = int(round(win_pct * 82))
+    wins = min(max(wins, 32), 62)
+    losses = 82 - wins
+    point_diff = int((0.8 - (seed or 12) * 0.2) + random.uniform(-3, 5))
+
+    return {
+        "team_id": team_id,
+        "seed": seed,
+        "conference": conf_key,
+        "division": division,
+        "wins": wins,
+        "losses": losses,
+        "win_pct": wins / 82 if 82 else 0,
+        "games_played": 82,
+        "point_diff": point_diff,
+    }
+
+
+def _build_random_conf_field(conf_key: str, my_team_id: Optional[str]) -> Dict[str, Any]:
+    conf_teams = [
+        tid
+        for tid, meta in TEAM_TO_CONF_DIV.items()
+        if (meta.get("conference") or "").lower() == conf_key
+    ]
+    random.shuffle(conf_teams)
+
+    auto_slots = list(range(1, 7))
+    play_in_slots = list(range(7, 11))
+    auto_bids: List[Dict[str, Any]] = []
+    play_in: List[Dict[str, Any]] = []
+    eliminated: List[Dict[str, Any]] = []
+
+    remaining = [tid for tid in conf_teams if tid != my_team_id]
+    random.shuffle(remaining)
+
+    if my_team_id:
+        my_seed = random.choice(auto_slots)
+        auto_slots.remove(my_seed)
+        auto_bids.append(_random_seed_entry(my_team_id, my_seed, conf_key))
+
+    for seed in auto_slots:
+        if not remaining:
+            break
+        auto_bids.append(_random_seed_entry(remaining.pop(), seed, conf_key))
+
+    for seed in play_in_slots:
+        if not remaining:
+            break
+        play_in.append(_random_seed_entry(remaining.pop(), seed, conf_key))
+
+    seed_counter = 11
+    while remaining:
+        eliminated.append(_random_seed_entry(remaining.pop(), seed_counter, conf_key))
+        seed_counter += 1
+
+    auto_bids = sorted(auto_bids, key=lambda r: r.get("seed") or 99)
+    play_in = sorted(play_in, key=lambda r: r.get("seed") or 99)
+
+    return {
+        "auto_bids": auto_bids,
+        "play_in": play_in,
+        "eliminated": eliminated,
+    }
+
+
 def _find_team_df(team_id: str):
     df = ROSTER_DF[ROSTER_DF["Team"] == team_id]
     if df.empty:
@@ -218,6 +290,19 @@ def build_postseason_field() -> Dict[str, Any]:
             "play_in": play_in,
             "eliminated": eliminated,
         }
+
+    ps = _ensure_postseason_state()
+    ps["field"] = field
+    return field
+
+
+def build_random_postseason_field(my_team_id: str) -> Dict[str, Any]:
+    field: Dict[str, Any] = {}
+    my_conf = (TEAM_TO_CONF_DIV.get(my_team_id, {}).get("conference") or "east").lower()
+
+    for conf_key in ("east", "west"):
+        attach_my_team = my_team_id if conf_key == my_conf else None
+        field[conf_key] = _build_random_conf_field(conf_key, attach_my_team)
 
     ps = _ensure_postseason_state()
     ps["field"] = field
@@ -790,11 +875,14 @@ def _prepare_play_in(field: Dict[str, Any], my_team_id: Optional[str]) -> Dict[s
     return play_in_state
 
 
-def initialize_postseason(my_team_id: str) -> Dict[str, Any]:
+def initialize_postseason(my_team_id: str, use_random_field: bool = False) -> Dict[str, Any]:
     reset_postseason_state()
     postseason = _ensure_postseason_state()
     postseason["my_team_id"] = my_team_id
-    field = build_postseason_field()
+    if use_random_field:
+        field = build_random_postseason_field(my_team_id)
+    else:
+        field = build_postseason_field()
 
     play_in_state = _prepare_play_in(field, my_team_id)
 

@@ -96,6 +96,7 @@ class AdvanceLeagueRequest(BaseModel):
 
 class PostseasonSetupRequest(BaseModel):
     my_team_id: str
+    use_random_field: bool = False
 
 
 class EmptyRequest(BaseModel):
@@ -245,7 +246,7 @@ async def api_postseason_reset():
 @app.post("/api/postseason/setup")
 async def api_postseason_setup(req: PostseasonSetupRequest):
     try:
-        return initialize_postseason(req.my_team_id)
+        return initialize_postseason(req.my_team_id, use_random_field=req.use_random_field)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
