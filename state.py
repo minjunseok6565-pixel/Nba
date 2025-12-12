@@ -433,6 +433,49 @@ def _update_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]
 
 
 
+def _update_playoff_player_stats_from_boxscore(boxscore: Dict[str, List[Dict[str, Any]]]) -> None:
+    """박스스코어를 포스트시즌 누적 player_stats에 반영한다."""
+    if not boxscore:
+        return
+
+    postseason = GAME_STATE.setdefault("postseason", {})
+    playoff_stats = postseason.setdefault("playoff_player_stats", {})
+    track_stats = ["PTS", "AST", "REB", "3PM"]
+
+    for team_rows in boxscore.values():
+        if not isinstance(team_rows, list):
+            continue
+        for row in team_rows:
+            if not isinstance(row, dict):
+                continue
+            player_id = row.get("PlayerID")
+            if player_id is None:
+                continue
+            stat_entry = playoff_stats.setdefault(
+                player_id,
+                {
+                    "player_id": player_id,
+                    "name": row.get("Name"),
+                    "team_id": row.get("Team"),
+                    "games": 0,
+                    "totals": {s: 0.0 for s in track_stats},
+                },
+            )
+
+            stat_entry["name"] = row.get("Name", stat_entry.get("name"))
+            stat_entry["team_id"] = row.get("Team", stat_entry.get("team_id"))
+            stat_entry["games"] = stat_entry.get("games", 0) + 1
+
+            totals = stat_entry.setdefault("totals", {s: 0.0 for s in track_stats})
+            for stat_name in track_stats:
+                try:
+                    totals[stat_name] = float(totals.get(stat_name, 0.0)) + float(
+                        row.get(stat_name, 0) or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
+
+
 def get_schedule_summary() -> Dict[str, Any]:
     """마스터 스케줄 통계 요약을 반환한다.
 
