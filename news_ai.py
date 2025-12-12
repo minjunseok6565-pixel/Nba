@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
 
@@ -30,6 +30,28 @@ def _extract_text_from_gemini_response(resp: Any) -> str:
     return str(resp)
 
 
+def _ensure_playoff_news_cache() -> Dict[str, Any]:
+    cached_views = GAME_STATE.setdefault("cached_views", {})
+    playoff_news = cached_views.setdefault(
+        "playoff_news", {"series_game_counts": {}, "items": []}
+    )
+    playoff_news.setdefault("series_game_counts", {})
+    playoff_news.setdefault("items", [])
+    return playoff_news
+
+
+def _playoff_round_label(round_name: Optional[str]) -> str:
+    mapping = {
+        "Conference Quarterfinals": "플레이오프 1라운드",
+        "Conference Semifinals": "플레이오프 2라운드",
+        "Conference Finals": "컨퍼런스 파이널",
+        "NBA Finals": "NBA 파이널",
+    }
+    if not round_name:
+        return "플레이오프"
+    return mapping.get(round_name, round_name)
+
+
 def _get_current_date() -> date:
     league = _ensure_league_state()
     cur = league.get("current_date") or date.today().isoformat()
@@ -37,6 +59,52 @@ def _get_current_date() -> date:
         return date.fromisoformat(cur)
     except ValueError:
         return date.today()
+
+
+def _iter_playoff_series(playoffs: Dict[str, Any]) -> List[Dict[str, Any]]:
+    bracket = playoffs.get("bracket", {})
+    series_list: List[Dict[str, Any]] = []
+
+    for series in bracket.get("east", {}).get("quarterfinals", []) or []:
+        if series:
+            series_list.append(series)
+    for series in bracket.get("west", {}).get("quarterfinals", []) or []:
+        if series:
+            series_list.append(series)
+
+    for series in bracket.get("east", {}).get("semifinals", []) or []:
+        if series:
+            series_list.append(series)
+    for series in bracket.get("west", {}).get("semifinals", []) or []:
+        if series:
+            series_list.append(series)
+
+    east_final = bracket.get("east", {}).get("finals")
+    if east_final:
+        series_list.append(east_final)
+    west_final = bracket.get("west", {}).get("finals")
+    if west_final:
+        series_list.append(west_final)
+
+    finals = bracket.get("finals")
+    if finals:
+        series_list.append(finals)
+
+    return series_list
+
+
+def _series_key(series: Dict[str, Any]) -> str:
+    return f"{series.get('round')}::{series.get('home_court')}::{series.get('road')}"
+
+
+def _wins_through_game(series: Dict[str, Any], game_index: int) -> Dict[str, int]:
+    wins: Dict[str, int] = {}
+    for game in (series.get("games", []) or [])[: game_index + 1]:
+        winner = game.get("winner")
+        if not winner:
+            continue
+        wins[winner] = wins.get(winner, 0) + 1
+    return wins
 
 
 def _week_start(d: date) -> date:
@@ -170,3 +238,75 @@ def refresh_weekly_news(api_key: str) -> Dict[str, Any]:
     cache["items"] = items
 
     return {"current_date": current_date.isoformat(), "items": items}
+
+
+# ---------------------------------------------------------------------------
+# 플레이오프 모드 뉴스 (각 경기마다 갱신)
+# ---------------------------------------------------------------------------
+
+
+def _build_playoff_game_article(series: Dict[str, Any], game_index: int) -> Optional[Dict[str, Any]]:
+    games = series.get("games") or []
+    if game_index >= len(games):
+        return None
+
+    game = games[game_index]
+    home_id = series.get("home_court")
+    road_id = series.get("road")
+    winner = game.get("winner")
+    if not home_id or not road_id or not winner:
+        return None
+
+    loser = road_id if winner == home_id else home_id
+    wins = _wins_through_game(series, game_index)
+    home_wins = wins.get(home_id, 0)
+    road_wins = wins.get(road_id, 0)
+    series_score = f"{home_wins}-{road_wins}"
+
+    round_label = _playoff_round_label(series.get("round"))
+    game_number = game_index + 1
+    score_str = f"{game.get('home_score', 0)}-{game.get('away_score', 0)}"
+
+    title = f"{round_label} G{game_number}: {winner} 승리"
+    summary = (
+        f"{round_label}에서 {winner}가 {loser}을 상대로 {score_str}로 승리하며 "
+        f"시리즈를 {series_score}로 만들었다."
+    )
+
+    return {
+        "title": title,
+        "summary": summary,
+        "tags": ["playoffs", "game_result", series.get("round")],
+        "related_team_ids": [home_id, road_id],
+        "related_player_names": [],
+    }
+
+
+def refresh_playoff_news() -> Dict[str, Any]:
+    postseason = GAME_STATE.get("postseason") or {}
+    playoffs = postseason.get("playoffs")
+    if not playoffs:
+        raise ValueError("플레이오프 진행 중이 아닙니다.")
+
+    cache = _ensure_playoff_news_cache()
+    series_counts = cache.setdefault("series_game_counts", {})
+    items = cache.setdefault("items", [])
+
+    new_items: List[Dict[str, Any]] = []
+    for series in _iter_playoff_series(playoffs):
+        if not series:
+            continue
+        key = _series_key(series)
+        prev_count = series_counts.get(key, 0)
+        games = series.get("games") or []
+        for idx in range(prev_count, len(games)):
+            article = _build_playoff_game_article(series, idx)
+            if article:
+                items.append(article)
+                new_items.append(article)
+        series_counts[key] = len(games)
+
+    cache["items"] = items
+    cache["series_game_counts"] = series_counts
+
+    return {"items": items, "new_items": new_items}
