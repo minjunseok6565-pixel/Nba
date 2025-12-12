@@ -160,6 +160,12 @@ button[disabled] { opacity:0.55; cursor:default; box-shadow:none; }
   color:#16a34a;
   min-height:1.1em;
 }
+.info-message {
+  margin-top:8px;
+  font-size:0.85rem;
+  color:var(--text-muted);
+  min-height:1.1em;
+}
 
 .api-key-hint {
   margin-top:10px;

@@ -21,6 +21,7 @@
         </p>
         <label for="apiKeyInput" style="font-size:0.85rem;margin-bottom:4px;display:block;">Google API 키</label>
         <input id="apiKeyInput" type="text" placeholder="예: AIza..." />
+        <div class="info-message" id="apiStatus"></div>
         <div class="error-message" id="apiError"></div>
         <div class="success-message" id="apiSuccess"></div>
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -239,6 +240,7 @@
     const screenMain = document.getElementById('screen-main');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const btnValidateKey = document.getElementById('btnValidateKey');
+    const apiStatus = document.getElementById('apiStatus');
     const apiError = document.getElementById('apiError');
     const apiSuccess = document.getElementById('apiSuccess');
     const teamGrid = document.getElementById('teamGrid');
@@ -307,6 +309,7 @@
       const key = apiKeyInput.value.trim();
       apiError.textContent = '';
       apiSuccess.textContent = '';
+      apiStatus.textContent = '';
 
       if (!key) {
         apiError.textContent = 'Gemini API 키를 입력해주세요.';
@@ -320,19 +323,32 @@
       btnValidateKey.disabled = true;
       const original = btnValidateKey.textContent;
       btnValidateKey.textContent = '검증 중...';
+      apiStatus.textContent = 'API 키 확인 중입니다...';
       try {
         const res = await fetch('/api/validate-key', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ apiKey: key })
         });
-        if (!res.ok) {
-          throw new Error('API 키 검증에 실패했습니다.');
+        let detail = '';
+        try {
+          const body = await res.json();
+          detail = body?.detail || '';
+        } catch (e) {
+          detail = '';
         }
-        apiSuccess.textContent = 'API 키가 확인되었습니다!';
+        if (!res.ok) {
+          const message = res.status === 401
+            ? '잘못된 API 키입니다. 키를 확인한 뒤 다시 시도해주세요.'
+            : (detail || 'API 키 검증에 실패했습니다.');
+          throw new Error(message);
+        }
+        apiStatus.textContent = '';
+        apiSuccess.textContent = 'API 키가 확인되었습니다! 팀 선택 화면으로 이동합니다.';
         appState.apiKey = key;
         showStep('team');
       } catch (err) {
+        apiStatus.textContent = '';
         apiError.textContent = err.message || 'API 키 검증 중 오류가 발생했습니다.';
       } finally {
         btnValidateKey.disabled = false;
