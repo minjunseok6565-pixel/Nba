@@ -1241,3 +1241,259 @@ tr:last-child td { border-bottom:none; }
   background: #020617;
   color: #e5e7eb;
 }
+
+/* -------------------------------------------------- */
+/* Playoff 전용 페이지                               */
+/* -------------------------------------------------- */
+.playoff-app .main-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.playoff-main {
+  padding: 18px 24px 32px;
+}
+
+.playoff-tab {
+  display: none;
+}
+
+.playoff-tab.active {
+  display: block;
+}
+
+.home-matchup-card {
+  background: linear-gradient(135deg, #0f172a, #0b1220);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.home-matchup-label {
+  color: #93c5fd;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.home-matchup-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.team-chip {
+  background: #1f2937;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #e2e8f0;
+  min-width: 180px;
+  text-align: center;
+}
+
+.team-chip.alt {
+  background: #0b3b74;
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.vs-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+}
+
+.vs-main {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.vs-sub {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+.home-matchup-footer {
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.home-actions .action-spacer {
+  flex: 1;
+}
+
+.tactics-collapsible {
+  display: none;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #0b1220;
+}
+
+.tactics-collapsible.open {
+  display: block;
+}
+
+.bracket-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.bracket-conf {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  background: #0f172a;
+}
+
+.bracket-conf-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #c7d2fe;
+}
+
+.bracket-column {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #0b1220;
+}
+
+.bracket-round-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.bracket-card {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #111827;
+  margin-bottom: 8px;
+}
+
+.bracket-matchup {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.bracket-teams {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.bracket-teams .score {
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.bracket-finals {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(120deg, rgba(248, 113, 113, 0.12), rgba(59, 130, 246, 0.08));
+}
+
+.bracket-final-title {
+  font-weight: 800;
+  color: #fcd34d;
+  margin-bottom: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #0f172a;
+}
+
+.stat-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #c7d2fe;
+}
+
+.stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+  background: #0b1220;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.stat-list .value {
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.news-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #0f172a;
+}
+
+.news-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.news-body {
+  margin: 0;
+  color: #e5e7eb;
+}
+
+.news-meta {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}

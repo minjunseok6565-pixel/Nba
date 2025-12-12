@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>느바 시뮬 - Playoff Lab</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&display=swap" />
+</head>
+<body>
+  <div id="app" class="playoff-app">
+    <!-- STEP 1: API 키 입력 -->
+    <section id="screen-api-key" class="step active">
+      <div class="center-wrapper">
+        <div class="logo-large">
+          <span class="logo">플레이오프 · <strong>LAB</strong></span>
+          <span class="badge">테스트 모드</span>
+        </div>
+        <p class="muted" style="font-size:0.9rem;margin-bottom:12px;">
+          Google Gemini API 키를 먼저 입력해주세요. 키는 브라우저에만 사용됩니다.
+        </p>
+        <label for="apiKeyInput" style="font-size:0.85rem;margin-bottom:4px;display:block;">Google API 키</label>
+        <input id="apiKeyInput" type="text" placeholder="예: AIza..." />
+        <div class="error-message" id="apiError"></div>
+        <div class="success-message" id="apiSuccess"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="btnValidateKey">API 키 확인 및 계속</button>
+          <button class="secondary small" type="button" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">
+            키 발급 페이지 열기
+          </button>
+        </div>
+        <div class="api-key-hint">
+          <div style="font-weight:500;margin-bottom:4px;font-size:0.82rem;">힌트</div>
+          <ul style="margin:0;padding-left:16px;font-size:0.78rem;">
+            <li>메인 모델: <code>gemini-3-pro-preview</code></li>
+            <li>테스트용 플레이오프 UI입니다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: 팀 선택 -->
+    <section id="screen-team-select" class="step">
+      <div class="center-wrapper">
+        <div class="logo-large" style="margin-bottom:8px;">
+          <span class="logo">느바 시뮬 · <strong>팀 선택</strong></span>
+        </div>
+        <p class="muted" style="font-size:0.88rem;">
+          GM으로 플레이할 팀을 선택하세요. 선택한 팀은 바로 플레이오프에 직행합니다.
+        </p>
+
+        <div class="team-grid" id="teamGrid"></div>
+
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;">
+          <div>
+            <div class="muted" style="margin-bottom:2px;">선택한 팀</div>
+            <div><strong id="chosenTeamLabel">없음</strong></div>
+          </div>
+          <button id="btnTeamContinue" disabled>이 팀으로 플레이오프 시작</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: 플레이오프 메인 화면 -->
+    <section id="screen-main" class="step">
+      <div class="main-shell">
+        <header class="top-nav">
+          <div class="top-nav-left">
+            <div class="brand-nba">
+              <div class="nba-parallelogram">
+                <svg viewBox="0 0 646 212" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                  <path
+                    fill="#ffffff"
+                    fill-rule="evenodd"
+                    d="M194.5,212.0 L130.5,212.0 L113.0,175.5 L109.0,163.5 L80.5,100.0 L79.0,100.5 L78.0,104.5 L78.0,112.5 L61.0,211.5 L0.0,211.5 L18.0,103.5 L21.0,92.5 L24.0,67.5 L30.0,39.5 L35.0,2.5 L36.5,0.0 L103.5,0.0 L142.0,92.5 L151.5,112.0 L170.0,0.5 L231.0,0.5 L194.5,212.0 Z M349.5,212.0 L225.0,211.5 L255.0,31.5 L261.5,0.0 L387.5,1.0 L402.5,5.0 L412.5,10.0 L422.0,17.5 L429.0,28.5 L432.0,39.5 L432.0,54.5 L427.0,73.5 L420.0,84.5 L411.5,93.0 L398.0,101.5 L398.5,104.0 L409.5,111.0 L415.0,116.5 L422.0,128.5 L424.0,151.5 L419.0,171.5 L408.0,188.5 L396.5,198.0 L376.5,207.0 L349.5,212.0 Z M645.5,212.0 L581.5,212.0 L577.0,182.5 L574.5,176.0 L501.5,176.0 L484.5,212.0 L420.0,211.5 L473.0,104.5 L527.5,0.0 L607.0,0.5 L633.0,144.5 L639.0,170.5 L639.0,176.5 L646.0,207.5 L645.5,212.0 Z M350.0,83.5 L359.5,81.0 L367.0,73.5 L370.0,66.5 L370.0,57.5 L368.0,52.5 L364.5,49.0 L356.5,46.0 L314.5,46.0 L308.0,83.5 L350.0,83.5 Z M547.0,129.5 L569.0,128.5 L557.5,56.0 L524.0,126.5 L524.5,129.0 L547.0,129.5 Z M344.0,164.5 L354.5,161.0 L361.0,152.5 L363.0,146.5 L363.0,139.5 L357.5,131.0 L348.5,127.0 L300.0,127.5 L294.0,158.5 L294.5,165.0 L344.0,164.5 Z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div class="brand-text">
+              <div class="logo-small"><span>PO</span></div>
+            </div>
+          </div>
+
+          <nav class="top-nav-center">
+            <button class="nav-tab active" data-tab="home">Home</button>
+            <button class="nav-tab" data-tab="bracket">Bracket</button>
+            <button class="nav-tab" data-tab="stats">Stats</button>
+            <button class="nav-tab" data-tab="news">News</button>
+          </nav>
+
+          <div class="top-nav-right">
+            <div class="pill">내 팀: <span id="currentTeamLabel">-</span></div>
+            <div class="pill">라운드: <span id="roundLabel">-</span></div>
+            <div class="pill">진행 상태: <span id="progressLabel">-</span></div>
+          </div>
+        </header>
+
+        <main class="playoff-main">
+          <div class="tab-header">
+            <div>
+              <div class="tab-eyebrow">Playoff Lab</div>
+              <h1 class="tab-title" id="tabTitle">Home</h1>
+            </div>
+            <div class="pill" id="bracketStatus">브래킷 준비 중</div>
+          </div>
+
+          <!-- Home Tab -->
+          <section id="tab-home" class="tab-screen active playoff-tab">
+            <div class="home-matchup-card">
+              <div class="home-matchup-label">현재 시리즈</div>
+              <div class="home-matchup-body">
+                <div class="team-chip" id="homeMyTeam">팀 A</div>
+                <div class="vs-block">
+                  <div class="vs-main">VS</div>
+                  <div class="vs-sub" id="seriesMeta">라운드 / 스코어</div>
+                </div>
+                <div class="team-chip alt" id="homeOpponent">팀 B</div>
+              </div>
+              <div class="home-matchup-footer" id="seriesFooter">브래킷을 불러오세요.</div>
+            </div>
+
+            <div class="home-actions">
+              <button id="btnToggleTactics" class="secondary">상대 맞춤 전술</button>
+              <div class="action-spacer"></div>
+              <button id="btnPlayGame">내 팀 경기 진행</button>
+            </div>
+
+            <div id="tacticsPanel" class="tactics-collapsible">
+              <div class="tactics-layout">
+                <div class="tactics-section">
+                  <h3>기본 전술 설정</h3>
+                  <div class="tactics-row">
+                    <label for="tactics-pace">Pace</label>
+                    <input type="range" id="tactics-pace" min="-2" max="2" step="1" />
+                    <span id="tactics-pace-label" class="tactics-pace-label"></span>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-offense-scheme">공격 스킴</label>
+                    <select id="tactics-offense-scheme">
+                      <option value="pace_space">Pace &amp; Space</option>
+                      <option value="five_out_motion">5-Out Motion</option>
+                      <option value="pnr_heavy">PnR Heavy</option>
+                      <option value="post_up_focus">Post-Up Focus</option>
+                      <option value="iso_heavy">Isolation Heavy</option>
+                      <option value="drive_kick">Drive &amp; Kick</option>
+                    </select>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-offense-scheme-secondary">보조 공격 스킴</label>
+                    <select id="tactics-offense-scheme-secondary">
+                      <option value="none">보조 스킴 없음</option>
+                      <option value="pace_space">Pace &amp; Space</option>
+                      <option value="five_out_motion">5-Out Motion</option>
+                      <option value="pnr_heavy">PnR Heavy</option>
+                      <option value="post_up_focus">Post-Up Focus</option>
+                      <option value="iso_heavy">Isolation Heavy</option>
+                      <option value="drive_kick">Drive &amp; Kick</option>
+                    </select>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-offense-share">공격 스킴 배분</label>
+                    <input type="range" id="tactics-offense-share" min="0" max="5" step="1" />
+                    <span id="tactics-offense-share-label" class="tactics-pace-label"></span>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-defense-scheme">수비 스킴</label>
+                    <select id="tactics-defense-scheme">
+                      <option value="drop_coverage">Drop Coverage</option>
+                      <option value="switch_all">Switch Everything</option>
+                      <option value="hedge_recover">Hedge &amp; Recover</option>
+                      <option value="blitz_pnr">Blitz PnR</option>
+                      <option value="zone_2_3">2-3 Zone</option>
+                      <option value="full_court_press">Full-Court Press</option>
+                    </select>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-defense-scheme-secondary">보조 수비 스킴</label>
+                    <select id="tactics-defense-scheme-secondary">
+                      <option value="none">보조 스킴 없음</option>
+                      <option value="drop_coverage">Drop Coverage</option>
+                      <option value="switch_all">Switch Everything</option>
+                      <option value="hedge_recover">Hedge &amp; Recover</option>
+                      <option value="blitz_pnr">Blitz PnR</option>
+                      <option value="zone_2_3">2-3 Zone</option>
+                      <option value="full_court_press">Full-Court Press</option>
+                    </select>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-defense-share">수비 스킴 배분</label>
+                    <input type="range" id="tactics-defense-share" min="0" max="5" step="1" />
+                    <span id="tactics-defense-share-label" class="tactics-pace-label"></span>
+                  </div>
+                  <div class="tactics-row">
+                    <label for="tactics-rotation-size">로테이션 인원</label>
+                    <select id="tactics-rotation-size">
+                      <option value="6">6명</option>
+                      <option value="7">7명</option>
+                      <option value="8">8명</option>
+                      <option value="9">9명</option>
+                      <option value="10">10명</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="tactics-section">
+                  <h3>선수 기용 메모</h3>
+                  <textarea id="tacticsNotes" placeholder="매치업 대비 메모를 남겨주세요." style="height:220px;"></textarea>
+                  <p class="muted" style="font-size:0.8rem;margin-top:8px;">현재 단계에서는 전술 설정이 UI에만 저장됩니다.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Bracket Tab -->
+          <section id="tab-bracket" class="tab-screen playoff-tab">
+            <div class="bracket-grid" id="bracketGrid">
+              <p class="muted">브래킷을 불러오는 중입니다...</p>
+            </div>
+          </section>
+
+          <!-- Stats Tab -->
+          <section id="tab-stats" class="tab-screen playoff-tab">
+            <div id="statsContainer" class="stats-grid"></div>
+          </section>
+
+          <!-- News Tab -->
+          <section id="tab-news" class="tab-screen playoff-tab">
+            <div id="newsList" class="news-list"></div>
+          </section>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <script src="/static/state.js"></script>
+  <script>
+    const screenApiKey = document.getElementById('screen-api-key');
+    const screenTeamSelect = document.getElementById('screen-team-select');
+    const screenMain = document.getElementById('screen-main');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const btnValidateKey = document.getElementById('btnValidateKey');
+    const apiError = document.getElementById('apiError');
+    const apiSuccess = document.getElementById('apiSuccess');
+    const teamGrid = document.getElementById('teamGrid');
+    const chosenTeamLabel = document.getElementById('chosenTeamLabel');
+    const btnTeamContinue = document.getElementById('btnTeamContinue');
+    const currentTeamLabel = document.getElementById('currentTeamLabel');
+    const roundLabel = document.getElementById('roundLabel');
+    const progressLabel = document.getElementById('progressLabel');
+    const navTabs = document.querySelectorAll('.nav-tab');
+    const tabTitle = document.getElementById('tabTitle');
+    const bracketStatus = document.getElementById('bracketStatus');
+    const bracketGrid = document.getElementById('bracketGrid');
+    const statsContainer = document.getElementById('statsContainer');
+    const newsList = document.getElementById('newsList');
+    const homeMyTeam = document.getElementById('homeMyTeam');
+    const homeOpponent = document.getElementById('homeOpponent');
+    const seriesMeta = document.getElementById('seriesMeta');
+    const seriesFooter = document.getElementById('seriesFooter');
+    const tacticsPanel = document.getElementById('tacticsPanel');
+    const btnToggleTactics = document.getElementById('btnToggleTactics');
+    const btnPlayGame = document.getElementById('btnPlayGame');
+
+    const appState = {
+      apiKey: null,
+      selectedTeam: null,
+      postseason: null,
+      stats: null,
+      news: [],
+      tactics: {},
+    };
+
+    function showStep(name) {
+      screenApiKey.style.display = name === 'apiKey' ? 'block' : 'none';
+      screenTeamSelect.style.display = name === 'team' ? 'block' : 'none';
+      screenMain.style.display = name === 'main' ? 'block' : 'none';
+    }
+
+    function getTeamName(teamId) {
+      const team = TEAMS.find(t => t.id === teamId);
+      return team ? team.name : teamId || '-';
+    }
+
+    function renderTeamCards() {
+      teamGrid.innerHTML = '';
+      TEAMS.forEach(team => {
+        const card = document.createElement('div');
+        card.className = 'team-card';
+        card.innerHTML = `
+          <h3>${team.name}</h3>
+          <p>캡 상황: ${team.cap}</p>
+          <p>전력: ${team.overall}</p>
+          <p>난이도: ${team.difficulty}</p>
+        `;
+        card.addEventListener('click', () => selectTeam(team));
+        teamGrid.appendChild(card);
+      });
+    }
+
+    function selectTeam(team) {
+      appState.selectedTeam = team;
+      chosenTeamLabel.textContent = team.name;
+      btnTeamContinue.disabled = false;
+    }
+
+    btnValidateKey.addEventListener('click', async () => {
+      const key = apiKeyInput.value.trim();
+      apiError.textContent = '';
+      apiSuccess.textContent = '';
+
+      if (!key) {
+        apiError.textContent = 'Gemini API 키를 입력해주세요.';
+        return;
+      }
+      if (!/^AIza[0-9A-Za-z\-_]{10,}$/.test(key)) {
+        apiError.textContent = '키 형식이 올바르지 않습니다. AIza... 형태인지 확인하세요.';
+        return;
+      }
+
+      btnValidateKey.disabled = true;
+      const original = btnValidateKey.textContent;
+      btnValidateKey.textContent = '검증 중...';
+      try {
+        const res = await fetch('/api/validate-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: key })
+        });
+        if (!res.ok) {
+          throw new Error('API 키 검증에 실패했습니다.');
+        }
+        apiSuccess.textContent = 'API 키가 확인되었습니다!';
+        appState.apiKey = key;
+        showStep('team');
+      } catch (err) {
+        apiError.textContent = err.message || 'API 키 검증 중 오류가 발생했습니다.';
+      } finally {
+        btnValidateKey.disabled = false;
+        btnValidateKey.textContent = original;
+      }
+    });
+
+    btnTeamContinue.addEventListener('click', async () => {
+      if (!appState.selectedTeam) return;
+      currentTeamLabel.textContent = appState.selectedTeam.name;
+      await startPlayoffSetup();
+      showStep('main');
+      activateTab('home');
+    });
+
+    navTabs.forEach(tab => {
+      tab.addEventListener('click', () => activateTab(tab.dataset.tab));
+    });
+
+    function activateTab(tabName) {
+      document.querySelectorAll('.tab-screen').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      const target = document.getElementById(`tab-${tabName}`);
+      const nav = document.querySelector(`.nav-tab[data-tab="${tabName}"]`);
+      if (target) target.classList.add('active');
+      if (nav) nav.classList.add('active');
+      tabTitle.textContent = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+    }
+
+    async function startPlayoffSetup() {
+      bracketStatus.textContent = '브래킷 초기화 중...';
+      try {
+        await fetch('/api/postseason/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        await fetch('/api/postseason/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ my_team_id: appState.selectedTeam.id, use_random_field: true })
+        });
+        await refreshPostseason();
+        await Promise.all([refreshStats(), refreshNews()]);
+      } catch (err) {
+        bracketStatus.textContent = '브래킷 초기화 실패';
+      }
+    }
+
+    async function refreshPostseason() {
+      const res = await fetch('/api/postseason/state');
+      const data = await res.json();
+      appState.postseason = data;
+      renderPostseason();
+    }
+
+    async function refreshStats() {
+      const res = await fetch('/api/stats/playoffs/leaders');
+      appState.stats = await res.json();
+      renderStats();
+    }
+
+    async function refreshNews() {
+      try {
+        const res = await fetch('/api/news/playoffs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await res.json();
+        appState.news = data.items || [];
+      } catch (err) {
+        appState.news = [];
+      }
+      renderNews();
+    }
+
+    function renderPostseason() {
+      const playoffs = appState.postseason?.playoffs;
+      if (!playoffs) {
+        bracketStatus.textContent = '브래킷을 찾을 수 없습니다';
+        return;
+      }
+      const round = playoffs.current_round || 'Conference Quarterfinals';
+      const champion = appState.postseason?.champion;
+      roundLabel.textContent = round;
+      progressLabel.textContent = champion ? '종료' : '진행 중';
+      bracketStatus.textContent = champion ? `${getTeamName(champion)} 우승!` : '진행 중 브래킷';
+
+      renderHomeMatchup();
+      renderBracket();
+    }
+
+    function collectRoundSeries(playoffs, roundName) {
+      const bracket = playoffs?.bracket || {};
+      if (!bracket) return [];
+      if (roundName === 'Conference Quarterfinals') {
+        return [...(bracket.east?.quarterfinals || []), ...(bracket.west?.quarterfinals || [])];
+      }
+      if (roundName === 'Conference Semifinals') {
+        return [...(bracket.east?.semifinals || []), ...(bracket.west?.semifinals || [])];
+      }
+      if (roundName === 'Conference Finals') {
+        const east = bracket.east?.finals ? [bracket.east.finals] : [];
+        const west = bracket.west?.finals ? [bracket.west.finals] : [];
+        return [...east, ...west];
+      }
+      if (roundName === 'NBA Finals') {
+        return bracket.finals ? [bracket.finals] : [];
+      }
+      return [];
+    }
+
+    function findMySeries() {
+      const playoffs = appState.postseason?.playoffs;
+      if (!playoffs || !appState.selectedTeam) return null;
+      const round = playoffs.current_round || 'Conference Quarterfinals';
+      const seriesList = collectRoundSeries(playoffs, round);
+      return seriesList.find(s => s && (s.home_court === appState.selectedTeam.id || s.road === appState.selectedTeam.id));
+    }
+
+    function seriesScore(series) {
+      if (!series) return '0 - 0';
+      const wins = series.wins || {};
+      const homeWins = wins[series.home_court] || 0;
+      const roadWins = wins[series.road] || 0;
+      return `${homeWins} - ${roadWins}`;
+    }
+
+    function renderHomeMatchup() {
+      const playoffs = appState.postseason?.playoffs;
+      const series = findMySeries();
+      const champion = appState.postseason?.champion;
+      if (!series || !playoffs) {
+        homeMyTeam.textContent = appState.selectedTeam ? appState.selectedTeam.name : '팀 A';
+        homeOpponent.textContent = '상대 미정';
+        seriesMeta.textContent = '시리즈 없음';
+        seriesFooter.textContent = champion ? `${getTeamName(champion)} 우승` : '브래킷 정보를 불러오는 중입니다.';
+        return;
+      }
+      const opponentId = series.home_court === appState.selectedTeam.id ? series.road : series.home_court;
+      homeMyTeam.textContent = getTeamName(appState.selectedTeam.id);
+      homeOpponent.textContent = getTeamName(opponentId);
+      seriesMeta.textContent = `${series.round} · ${series.matchup} · ${seriesScore(series)}`;
+      if (series.winner) {
+        seriesFooter.textContent = `${getTeamName(series.winner)} 승리 (${seriesScore(series)})`;
+      } else {
+        seriesFooter.textContent = `${getTeamName(appState.selectedTeam.id)} 경기 진행 가능`;
+      }
+    }
+
+    function renderBracket() {
+      const playoffs = appState.postseason?.playoffs;
+      if (!playoffs) {
+        bracketGrid.innerHTML = '<p class="muted">브래킷 정보가 없습니다.</p>';
+        return;
+      }
+      const bracket = playoffs.bracket || {};
+      const confBlocks = ['east', 'west'];
+      bracketGrid.innerHTML = '';
+
+      confBlocks.forEach(conf => {
+        const confBox = document.createElement('div');
+        confBox.className = 'bracket-conf';
+        confBox.innerHTML = `<div class="bracket-conf-title">${conf === 'east' ? 'Eastern' : 'Western'} Conference</div>`;
+        const rounds = [
+          { key: 'quarterfinals', label: 'Quarterfinals' },
+          { key: 'semifinals', label: 'Semifinals' },
+          { key: 'finals', label: 'Conference Finals' },
+        ];
+        rounds.forEach(r => {
+          const column = document.createElement('div');
+          column.className = 'bracket-column';
+          column.innerHTML = `<div class="bracket-round-title">${r.label}</div>`;
+          const seriesList = (bracket[conf] && bracket[conf][r.key]) ? bracket[conf][r.key] : [];
+          (Array.isArray(seriesList) ? seriesList : [seriesList]).filter(Boolean).forEach(series => {
+            const card = document.createElement('div');
+            card.className = 'bracket-card';
+            card.innerHTML = `
+              <div class="bracket-matchup">${series.matchup || ''}</div>
+              <div class="bracket-teams">
+                <span>${getTeamName(series.home_court)}</span>
+                <span class="score">${series.wins?.[series.home_court] || 0}</span>
+              </div>
+              <div class="bracket-teams">
+                <span>${getTeamName(series.road)}</span>
+                <span class="score">${series.wins?.[series.road] || 0}</span>
+              </div>
+            `;
+            column.appendChild(card);
+          });
+          confBox.appendChild(column);
+        });
+        bracketGrid.appendChild(confBox);
+      });
+
+      if (bracket.finals) {
+        const finals = document.createElement('div');
+        finals.className = 'bracket-finals';
+        const series = bracket.finals;
+        finals.innerHTML = `
+          <div class="bracket-final-title">NBA Finals</div>
+          <div class="bracket-card">
+            <div class="bracket-matchup">${series.matchup || 'FINALS'}</div>
+            <div class="bracket-teams">
+              <span>${getTeamName(series.home_court)}</span>
+              <span class="score">${series.wins?.[series.home_court] || 0}</span>
+            </div>
+            <div class="bracket-teams">
+              <span>${getTeamName(series.road)}</span>
+              <span class="score">${series.wins?.[series.road] || 0}</span>
+            </div>
+          </div>
+        `;
+        bracketGrid.appendChild(finals);
+      }
+    }
+
+    function renderStats() {
+      statsContainer.innerHTML = '';
+      if (!appState.stats) {
+        statsContainer.innerHTML = '<p class="muted">스탯을 불러오는 중입니다...</p>';
+        return;
+      }
+      Object.entries(appState.stats).forEach(([stat, leaders]) => {
+        const card = document.createElement('div');
+        card.className = 'stat-card';
+        card.innerHTML = `<div class="stat-title">${stat} 리더</div>`;
+        if (!leaders || !leaders.length) {
+          card.innerHTML += '<p class="muted">데이터 없음</p>';
+        } else {
+          const list = document.createElement('ul');
+          list.className = 'stat-list';
+          leaders.forEach(row => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${row.name || '익명'} (${row.team_id || '-'})</span><span class="value">${(row[stat] || 0).toFixed ? (row[stat] || 0).toFixed(1) : (row[stat] || 0)}</span>`;
+            list.appendChild(li);
+          });
+          card.appendChild(list);
+        }
+        statsContainer.appendChild(card);
+      });
+    }
+
+    function renderNews() {
+      newsList.innerHTML = '';
+      if (!appState.news || !appState.news.length) {
+        newsList.innerHTML = '<p class="muted">아직 생성된 플레이오프 뉴스가 없습니다.</p>';
+        return;
+      }
+      appState.news.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'news-card';
+        div.innerHTML = `
+          <div class="news-title">${item.title || '무제'}</div>
+          <p class="news-body">${item.summary || ''}</p>
+          <div class="news-meta">태그: ${(item.tags || []).join(', ')}</div>
+        `;
+        newsList.appendChild(div);
+      });
+    }
+
+    btnToggleTactics.addEventListener('click', () => {
+      tacticsPanel.classList.toggle('open');
+    });
+
+    btnPlayGame.addEventListener('click', async () => {
+      btnPlayGame.disabled = true;
+      btnPlayGame.textContent = '경기 진행 중...';
+      try {
+        await fetch('/api/postseason/playoffs/advance-my-team-game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        await refreshPostseason();
+        await Promise.all([refreshStats(), refreshNews()]);
+      } catch (err) {
+        alert('경기 진행에 실패했습니다. 콘솔을 확인하세요.');
+      } finally {
+        btnPlayGame.disabled = false;
+        btnPlayGame.textContent = '내 팀 경기 진행';
+      }
+    });
+
+    renderTeamCards();
+  </script>
+</body>
+</html>
