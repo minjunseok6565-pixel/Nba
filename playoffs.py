@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from config import ROSTER_DF
 from match_engine import MatchEngine, Team
-from state import GAME_STATE, _update_playoff_player_stats_from_boxscore
+from state import (
+    GAME_STATE,
+    _ensure_league_state,
+    _update_playoff_player_stats_from_boxscore,
+    set_current_date,
+)
 from team_utils import get_conference_standings
 
 HomePattern = [True, True, False, False, True, False, True]
@@ -23,6 +29,73 @@ def _ensure_postseason_state() -> Dict[str, Any]:
     postseason.setdefault("my_team_id", None)
     postseason.setdefault("playoff_player_stats", {})
     return postseason
+
+
+def _safe_date_fromisoformat(date_str: Optional[str]) -> Optional[date]:
+    if not date_str:
+        return None
+    try:
+        return date.fromisoformat(str(date_str))
+    except ValueError:
+        return None
+
+
+def _regular_season_end_date() -> date:
+    league = _ensure_league_state()
+    master_schedule = league.get("master_schedule") or {}
+    by_date = master_schedule.get("by_date") or {}
+
+    latest: Optional[date] = None
+    for ds in by_date.keys():
+        parsed = _safe_date_fromisoformat(ds)
+        if parsed and (latest is None or parsed > latest):
+            latest = parsed
+
+    if latest:
+        return latest
+
+    season_start = _safe_date_fromisoformat(league.get("season_start"))
+    if season_start:
+        return season_start + timedelta(days=180)
+
+    return date.today()
+
+
+def _play_in_schedule_window() -> Tuple[date, date]:
+    season_end = _regular_season_end_date()
+    start = season_end + timedelta(days=2)
+    final_day = start + timedelta(days=2)
+    return start, final_day
+
+
+def _play_in_end_date(play_in_state: Dict[str, Any]) -> Optional[date]:
+    latest: Optional[date] = None
+    for conf_state in play_in_state.values():
+        matchups = conf_state.get("matchups") or {}
+        for key in ("seven_vs_eight", "nine_vs_ten", "final"):
+            d = _safe_date_fromisoformat((matchups.get(key) or {}).get("date"))
+            if d and (latest is None or d > latest):
+                latest = d
+    return latest
+
+
+def _round_latest_end(series_list: List[Dict[str, Any]]) -> Optional[date]:
+    latest: Optional[date] = None
+    for s in series_list:
+        games = s.get("games") or []
+        if not games:
+            continue
+        d = _safe_date_fromisoformat(games[-1].get("date"))
+        if d and (latest is None or d > latest):
+            latest = d
+    return latest
+
+
+def _next_round_start(series_list: List[Dict[str, Any]], buffer_days: int = 2) -> Optional[str]:
+    latest = _round_latest_end(series_list)
+    if not latest:
+        return None
+    return (latest + timedelta(days=buffer_days)).isoformat()
 
 
 def reset_postseason_state() -> Dict[str, Any]:
@@ -66,7 +139,19 @@ def _find_team_df(team_id: str):
     return df
 
 
-def _simulate_postseason_game(home_team_id: str, away_team_id: str) -> Dict[str, Any]:
+def _simulate_postseason_game(
+    home_team_id: str, away_team_id: str, game_date: Optional[str] = None
+) -> Dict[str, Any]:
+    if game_date:
+        try:
+            game_date = date.fromisoformat(str(game_date)).isoformat()
+        except ValueError:
+            game_date = str(game_date)
+    else:
+        game_date = date.today().isoformat()
+
+    set_current_date(game_date)
+
     home_df = _find_team_df(home_team_id)
     away_df = _find_team_df(away_team_id)
 
@@ -83,11 +168,13 @@ def _simulate_postseason_game(home_team_id: str, away_team_id: str) -> Dict[str,
     _update_playoff_player_stats_from_boxscore(result.get("boxscore"))
 
     return {
+        "date": game_date,
         "home_team_id": home_team_id,
         "away_team_id": away_team_id,
         "home_score": home_score,
         "away_score": away_score,
         "winner": winner,
+        "status": "final",
         "final_score": score,
         "boxscore": result.get("boxscore"),
     }
@@ -143,16 +230,19 @@ def _conference_play_in_template(conf_key: str, field: Dict[str, Any]) -> Dict[s
         "seven_vs_eight": {
             "home": seeds.get(7),
             "away": seeds.get(8),
+            "date": None,
             "result": None,
         },
         "nine_vs_ten": {
             "home": seeds.get(9),
             "away": seeds.get(10),
+            "date": None,
             "result": None,
         },
         "final": {
             "home": None,
             "away": None,
+            "date": None,
             "result": None,
         },
     }
@@ -220,10 +310,16 @@ def _apply_play_in_results(conf_state: Dict[str, Any]) -> None:
         matchups["final"]["home"], matchups["final"]["away"] = _pick_home_advantage(main_loser, lower_winner)
 
 
-def _simulate_play_in_game(home_entry: Optional[Dict[str, Any]], away_entry: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _simulate_play_in_game(
+    home_entry: Optional[Dict[str, Any]],
+    away_entry: Optional[Dict[str, Any]],
+    game_date: Optional[str],
+) -> Optional[Dict[str, Any]]:
     if not home_entry or not away_entry:
         return None
-    return _simulate_postseason_game(home_entry["team_id"], away_entry["team_id"])
+    return _simulate_postseason_game(
+        home_entry["team_id"], away_entry["team_id"], game_date=game_date
+    )
 
 
 def _auto_play_in_conf(conf_state: Dict[str, Any], my_team_id: Optional[str]) -> None:
@@ -238,7 +334,9 @@ def _auto_play_in_conf(conf_state: Dict[str, Any], my_team_id: Optional[str]) ->
                 continue
             if my_team_id in {home.get("team_id"), away.get("team_id")}:
                 continue
-            matchup["result"] = _simulate_play_in_game(home, away)
+            matchup["result"] = _simulate_play_in_game(
+                home, away, matchup.get("date")
+            )
 
     _apply_play_in_results(conf_state)
 
@@ -248,7 +346,9 @@ def _auto_play_in_conf(conf_state: Dict[str, Any], my_team_id: Optional[str]) ->
         away = final_matchup.get("away")
         if home and away and not final_matchup.get("result"):
             if my_team_id not in {home.get("team_id"), away.get("team_id")}:
-                final_matchup["result"] = _simulate_play_in_game(home, away)
+                final_matchup["result"] = _simulate_play_in_game(
+                    home, away, final_matchup.get("date")
+                )
         _apply_play_in_results(conf_state)
 
 
@@ -278,7 +378,9 @@ def play_my_team_play_in_game() -> Dict[str, Any]:
         home = matchup.get("home")
         away = matchup.get("away")
         if home and away and my_team_id in {home.get("team_id"), away.get("team_id")}:
-            matchup["result"] = _simulate_play_in_game(home, away)
+            matchup["result"] = _simulate_play_in_game(
+                home, away, matchup.get("date")
+            )
             _apply_play_in_results(conf_state)
             _auto_play_in_conf(conf_state, my_team_id)
             postseason["play_in"] = play_in
@@ -292,7 +394,14 @@ def play_my_team_play_in_game() -> Dict[str, Any]:
 # 플레이오프 시리즈
 # ---------------------------------------------------------------------------
 
-def _series_template(home_adv: Dict[str, Any], road: Dict[str, Any], round_name: str, matchup_label: str, best_of: int = 7) -> Dict[str, Any]:
+def _series_template(
+    home_adv: Dict[str, Any],
+    road: Dict[str, Any],
+    round_name: str,
+    matchup_label: str,
+    start_date: str,
+    best_of: int = 7,
+) -> Dict[str, Any]:
     return {
         "round": round_name,
         "matchup": matchup_label,
@@ -304,6 +413,7 @@ def _series_template(home_adv: Dict[str, Any], road: Dict[str, Any], round_name:
         "wins": {home_adv.get("team_id"): 0, road.get("team_id"): 0},
         "best_of": best_of,
         "winner": None,
+        "start_date": start_date,
     }
 
 
@@ -330,7 +440,16 @@ def _simulate_one_series_game(series: Dict[str, Any]) -> Dict[str, Any]:
     home_id = series["home_court"] if higher_is_home else series["road"]
     away_id = series["road"] if higher_is_home else series["home_court"]
 
-    game_result = _simulate_postseason_game(home_id, away_id)
+    if game_idx == 0:
+        next_game_date = series.get("start_date") or date.today().isoformat()
+    else:
+        last_game = series.get("games", [])[-1]
+        last_date = _safe_date_fromisoformat(last_game.get("date")) or date.today()
+        prev_home_flag = HomePattern[game_idx - 1]
+        rest_days = 1 if prev_home_flag == higher_is_home else 2
+        next_game_date = (last_date + timedelta(days=rest_days)).isoformat()
+
+    game_result = _simulate_postseason_game(home_id, away_id, game_date=next_game_date)
     series.setdefault("games", []).append(game_result)
 
     wins = series.setdefault("wins", {})
@@ -363,7 +482,9 @@ def _round_series(bracket: Dict[str, Any], round_name: str) -> List[Dict[str, An
 # 플레이오프 브래킷 생성
 # ---------------------------------------------------------------------------
 
-def _conference_quarterfinals(seeds: Dict[int, Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _conference_quarterfinals(
+    seeds: Dict[int, Dict[str, Any]], start_date: str
+) -> List[Dict[str, Any]]:
     qf_pairs = [(1, 8), (4, 5), (3, 6), (2, 7)]
     results = []
     for high, low in qf_pairs:
@@ -373,12 +494,20 @@ def _conference_quarterfinals(seeds: Dict[int, Dict[str, Any]]) -> List[Dict[str
             continue
         home, road = _pick_home_advantage(team_high, team_low)
         results.append(
-            _series_template(home, road, "Conference Quarterfinals", f"{high} vs {low}")
+            _series_template(
+                home,
+                road,
+                "Conference Quarterfinals",
+                f"{high} vs {low}",
+                start_date,
+            )
         )
     return results
 
 
-def _conference_semifinals_from_qf(qf_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _conference_semifinals_from_qf(
+    qf_list: List[Dict[str, Any]], start_date: str
+) -> List[Dict[str, Any]]:
     def _find_winner(matchup_prefix: str) -> Optional[Dict[str, Any]]:
         for s in qf_list:
             if s.get("matchup", "").startswith(matchup_prefix):
@@ -392,39 +521,56 @@ def _conference_semifinals_from_qf(qf_list: List[Dict[str, Any]]) -> List[Dict[s
             continue
         home, road = _pick_home_advantage(a, b)
         results.append(
-            _series_template(home, road, "Conference Semifinals", f"SF{idx}")
+            _series_template(
+                home,
+                road,
+                "Conference Semifinals",
+                f"SF{idx}",
+                start_date,
+            )
         )
     return results
 
 
-def _conference_finals_from_sf(sf_list: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _conference_finals_from_sf(
+    sf_list: List[Dict[str, Any]], start_date: str
+) -> Optional[Dict[str, Any]]:
     if len(sf_list) < 2:
         return None
     if not all(s.get("winner") for s in sf_list):
         return None
     home, road = _pick_home_advantage(sf_list[0]["winner"], sf_list[1]["winner"])
-    return _series_template(home, road, "Conference Finals", "CF")
+    return _series_template(home, road, "Conference Finals", "CF", start_date)
 
 
-def _finals_from_conf(east: Optional[Dict[str, Any]], west: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _finals_from_conf(
+    east: Optional[Dict[str, Any]], west: Optional[Dict[str, Any]], start_date: str
+) -> Optional[Dict[str, Any]]:
     if not east or not west:
         return None
     if not east.get("winner") or not west.get("winner"):
         return None
     home, road = _pick_home_advantage(east["winner"], west["winner"])
-    return _series_template(home, road, "NBA Finals", "FINALS")
+    return _series_template(home, road, "NBA Finals", "FINALS", start_date)
 
 
-def _initialize_playoffs(seeds_by_conf: Dict[str, Dict[int, Dict[str, Any]]]) -> None:
+def _initialize_playoffs(
+    seeds_by_conf: Dict[str, Dict[int, Dict[str, Any]]], start_date: date
+) -> None:
     postseason = _ensure_postseason_state()
+    start_date_str = start_date.isoformat()
     bracket = {
         "east": {
-            "quarterfinals": _conference_quarterfinals(seeds_by_conf.get("east", {})),
+            "quarterfinals": _conference_quarterfinals(
+                seeds_by_conf.get("east", {}), start_date_str
+            ),
             "semifinals": [],
             "finals": None,
         },
         "west": {
-            "quarterfinals": _conference_quarterfinals(seeds_by_conf.get("west", {})),
+            "quarterfinals": _conference_quarterfinals(
+                seeds_by_conf.get("west", {}), start_date_str
+            ),
             "semifinals": [],
             "finals": None,
         },
@@ -435,6 +581,7 @@ def _initialize_playoffs(seeds_by_conf: Dict[str, Dict[int, Dict[str, Any]]]) ->
         "seeds": seeds_by_conf,
         "bracket": bracket,
         "current_round": "Conference Quarterfinals",
+        "start_date": start_date_str,
     }
 
 
@@ -450,8 +597,13 @@ def _advance_round_if_ready() -> None:
     if current_round == "Conference Quarterfinals":
         qf_series = _round_series(bracket, current_round)
         if qf_series and all(_is_series_finished(s) for s in qf_series):
-            bracket["east"]["semifinals"] = _conference_semifinals_from_qf(bracket["east"].get("quarterfinals", []))
-            bracket["west"]["semifinals"] = _conference_semifinals_from_qf(bracket["west"].get("quarterfinals", []))
+            start_date = _next_round_start(qf_series) or playoffs.get("start_date") or date.today().isoformat()
+            bracket["east"]["semifinals"] = _conference_semifinals_from_qf(
+                bracket["east"].get("quarterfinals", []), start_date
+            )
+            bracket["west"]["semifinals"] = _conference_semifinals_from_qf(
+                bracket["west"].get("quarterfinals", []), start_date
+            )
             playoffs["current_round"] = "Conference Semifinals"
             postseason["playoffs"] = playoffs
             return
@@ -459,8 +611,13 @@ def _advance_round_if_ready() -> None:
     if current_round == "Conference Semifinals":
         sf_series = _round_series(bracket, current_round)
         if sf_series and all(_is_series_finished(s) for s in sf_series):
-            bracket["east"]["finals"] = _conference_finals_from_sf(bracket["east"].get("semifinals", []))
-            bracket["west"]["finals"] = _conference_finals_from_sf(bracket["west"].get("semifinals", []))
+            start_date = _next_round_start(sf_series) or playoffs.get("start_date") or date.today().isoformat()
+            bracket["east"]["finals"] = _conference_finals_from_sf(
+                bracket["east"].get("semifinals", []), start_date
+            )
+            bracket["west"]["finals"] = _conference_finals_from_sf(
+                bracket["west"].get("semifinals", []), start_date
+            )
             playoffs["current_round"] = "Conference Finals"
             postseason["playoffs"] = playoffs
             return
@@ -468,7 +625,12 @@ def _advance_round_if_ready() -> None:
     if current_round == "Conference Finals":
         cf_series = _round_series(bracket, current_round)
         if cf_series and all(_is_series_finished(s) for s in cf_series):
-            bracket["finals"] = _finals_from_conf(bracket.get("east", {}).get("finals"), bracket.get("west", {}).get("finals"))
+            start_date = _next_round_start(cf_series) or playoffs.get("start_date") or date.today().isoformat()
+            bracket["finals"] = _finals_from_conf(
+                bracket.get("east", {}).get("finals"),
+                bracket.get("west", {}).get("finals"),
+                start_date,
+            )
             playoffs["current_round"] = "NBA Finals"
             postseason["playoffs"] = playoffs
             return
@@ -572,17 +734,34 @@ def _maybe_start_playoffs_from_play_in() -> None:
             return
 
     seeds = _build_playoff_seeds(field, play_in)
-    _initialize_playoffs(seeds)
+    play_in_end = _safe_date_fromisoformat(
+        postseason.get("play_in_end_date")
+    ) or _play_in_end_date(play_in)
+    playoff_start = (play_in_end + timedelta(days=3)) if play_in_end else date.today()
+    postseason["playoffs_start_date"] = playoff_start.isoformat()
+    _initialize_playoffs(seeds, playoff_start)
 
 
 def _prepare_play_in(field: Dict[str, Any], my_team_id: Optional[str]) -> Dict[str, Any]:
     play_in_state: Dict[str, Any] = {}
+    start_date, final_date = _play_in_schedule_window()
+    start_date_str = start_date.isoformat()
+    final_date_str = final_date.isoformat()
+
     for conf_key in ("east", "west"):
         conf_state = _conference_play_in_template(conf_key, field)
+        conf_matchups = conf_state.get("matchups", {})
+        for key in ("seven_vs_eight", "nine_vs_ten"):
+            if key in conf_matchups:
+                conf_matchups[key]["date"] = start_date_str
+        if "final" in conf_matchups:
+            conf_matchups["final"]["date"] = final_date_str
         play_in_state[conf_key] = conf_state
 
     postseason = _ensure_postseason_state()
     postseason["play_in"] = play_in_state
+    postseason["play_in_start_date"] = start_date_str
+    postseason["play_in_end_date"] = final_date_str
 
     my_conf = None
     my_seed = None

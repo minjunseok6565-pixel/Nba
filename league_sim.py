@@ -4,7 +4,12 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 from config import ROSTER_DF
-from state import _ensure_league_state, update_state_with_game, initialize_master_schedule_if_needed
+from state import (
+    _ensure_league_state,
+    initialize_master_schedule_if_needed,
+    set_current_date,
+    update_state_with_game,
+)
 from trades_ai import _run_ai_gm_tick_if_needed
 from match_engine import Team, MatchEngine
 
@@ -108,7 +113,7 @@ def advance_league_until(
 
         day += timedelta(days=1)
 
-    league["current_date"] = target_date_str
+    set_current_date(target_date_str)
 
     # AI GM 트레이드 틱 (트레이드 데드라인 및 7일 간격 체크 포함)
     _run_ai_gm_tick_if_needed(target_date)
