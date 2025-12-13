@@ -66,6 +66,7 @@ const postseasonCallout = document.getElementById('postseasonCallout');
 const btnGoToPlayoff = document.getElementById('btnGoToPlayoff');
 const btnPlayoffGame = document.getElementById('btnPlayoffGame');
 const btnPlayInGame = document.getElementById('btnPlayInGame');
+const btnAutoAdvanceRound = document.getElementById('btnAutoAdvanceRound');
 
 // 메인 탭 요소
 const homeLog = document.getElementById('homeLog');
@@ -1434,6 +1435,9 @@ function renderPlayInStage(playInState) {
   if (btnPlayoffGame) {
     btnPlayoffGame.style.display = 'none';
   }
+  if (btnAutoAdvanceRound) {
+    btnAutoAdvanceRound.style.display = 'none';
+  }
 
   renderPlayInBracket(playInState);
 }
@@ -1522,6 +1526,11 @@ function renderPlayoffStage(playoffs) {
     playoffSeriesMeta.textContent = champion ? '포스트시즌 종료' : '현재 매치업 없음';
     playoffSeriesFooter.textContent = champion ? `${getTeamName(champion)} 우승` : '다음 매치업을 기다리는 중';
     if (btnPlayoffGame) btnPlayoffGame.style.display = 'none';
+    if (btnAutoAdvanceRound) {
+      const canAutoAdvance = !champion;
+      btnAutoAdvanceRound.style.display = canAutoAdvance ? 'inline-block' : 'none';
+      btnAutoAdvanceRound.disabled = !canAutoAdvance;
+    }
   } else {
     const opponentId = series.home_court === appState.selectedTeam.id ? series.road : series.home_court;
     playoffHomeMyTeam.textContent = getTeamName(appState.selectedTeam.id);
@@ -1533,6 +1542,11 @@ function renderPlayoffStage(playoffs) {
     if (btnPlayoffGame) {
       btnPlayoffGame.style.display = series.winner || champion ? 'none' : 'inline-block';
       btnPlayoffGame.disabled = !!series.winner;
+    }
+    if (btnAutoAdvanceRound) {
+      const canAutoAdvance = !champion && !!series.winner;
+      btnAutoAdvanceRound.style.display = canAutoAdvance ? 'inline-block' : 'none';
+      btnAutoAdvanceRound.disabled = !canAutoAdvance;
     }
   }
 
@@ -1711,6 +1725,40 @@ function renderPostseasonViews() {
   }
 }
 
+async function handleAutoAdvanceRound() {
+  if (!btnAutoAdvanceRound) return;
+  btnAutoAdvanceRound.disabled = true;
+  const prevText = btnAutoAdvanceRound.textContent;
+  btnAutoAdvanceRound.textContent = '라운드 자동 진행 중...';
+
+  try {
+    const res = await fetch('/api/postseason/playoffs/auto-advance-round', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const payload = await res.json();
+        detail = payload?.detail || '';
+      } catch (_) {}
+      alert('라운드 자동 진행 실패' + (detail ? (': ' + detail) : ''));
+      return;
+    }
+
+    await refreshPostseasonState();
+    await Promise.all([refreshPlayoffStats(), refreshPlayoffNews()]);
+  } catch (err) {
+    console.error(err);
+    alert('라운드 자동 진행에 실패했습니다. 콘솔을 확인하세요.');
+  } finally {
+    btnAutoAdvanceRound.disabled = false;
+    btnAutoAdvanceRound.textContent = prevText;
+  }
+}
+
 async function handlePlayoffGame() {
   if (!btnPlayoffGame) return;
   btnPlayoffGame.disabled = true;
@@ -1763,8 +1811,15 @@ if (btnPlayoffGame) {
   });
 }
 
+if (btnAutoAdvanceRound) {
+  btnAutoAdvanceRound.addEventListener('click', () => {
+    handleAutoAdvanceRound();
+  });
+}
+
 if (btnPlayInGame) {
   btnPlayInGame.addEventListener('click', () => {
     handlePlayInGame();
   });
 }
+
