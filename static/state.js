@@ -63,6 +63,287 @@ const TEAMS = [
   { id: 'WAS', name: 'Washington Wizards', cap: '재건', overall: 71, difficulty: '매우 어려움' }
 ];
 
+// 팀 선택 화면(우측 상세 패널)에 표시할 추가 정보 (여기 내용을 팀별로 직접 채우세요)
+// - key는 teamId (예: 'ATL')
+// - ui.js가 아래 필드를 사용합니다:
+//   home, offense, defense, corePlayers, picks, playStyle, cap, difficulty
+//   (cap/difficulty는 TEAMS 값을 그대로 쓰려면 생략 가능)
+const TEAM_SELECT_DETAILS = {
+ATL: {
+   home: 'Atlanta / State Farm Arena',
+   offense: 3,                 // 0~5
+  // defense: 2,                 // 0~5
+  // corePlayers: ['A', 'B'],    // 문자열 or 문자열 배열
+  // picks: '2025 1R, 2026 1R',  // 문자열 or 문자열 배열
+  // playStyle: '빠른 템포, PnR 중심',
+  // // cap: '중간 시장',
+  // // difficulty: '보통',
+},
+
+BOS: {
+  home: 'Boston / TD Garden',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '볼 무브먼트 중심',
+},
+
+BKN: {
+  home: 'Brooklyn / Barclays Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '아이솔 + 스페이싱',
+},
+
+CHA: {
+  home: 'Charlotte / Spectrum Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '빠른 트랜지션',
+},
+
+CHI: {
+  home: 'Chicago / United Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '미드레인지 중심',
+},
+
+CLE: {
+  home: 'Cleveland / Rocket Mortgage FieldHouse',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '수비 기반 하프코트',
+},
+
+DAL: {
+  home: 'Dallas / American Airlines Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '볼 핸들러 중심',
+},
+
+DEN: {
+  home: 'Denver / Ball Arena',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '하이포스트 플레이메이킹',
+},
+
+DET: {
+  home: 'Detroit / Little Caesars Arena',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '젊은 코어 육성',
+},
+
+GSW: {
+  home: 'Golden State / Chase Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '오프볼 무브먼트',
+},
+
+HOU: {
+  home: 'Houston / Toyota Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '드라이브 앤 킥',
+},
+
+IND: {
+  home: 'Indiana / Gainbridge Fieldhouse',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '빠른 템포',
+},
+
+LAC: {
+  home: 'LA Clippers / Intuit Dome',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '윙 중심 아이솔',
+},
+
+LAL: {
+  home: 'LA Lakers / Crypto.com Arena',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '스타 파워 중심',
+},
+
+MEM: {
+  home: 'Memphis / FedExForum',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '공격적 수비 + 속공',
+},
+
+MIA: {
+  home: 'Miami / Kaseya Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '하프코트 전술',
+},
+
+MIL: {
+  home: 'Milwaukee / Fiserv Forum',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '림 어택 중심',
+},
+
+MIN: {
+  home: 'Minnesota / Target Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '수비 + 리바운드',
+},
+
+NOP: {
+  home: 'New Orleans / Smoothie King Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '인사이드 중심',
+},
+
+NYK: {
+  home: 'New York / Madison Square Garden',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '피지컬 하프코트',
+},
+
+OKC: {
+  home: 'Oklahoma City / Paycom Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '드라이브 기반',
+},
+
+ORL: {
+  home: 'Orlando / Kia Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '수비 중심 성장',
+},
+
+PHI: {
+  home: 'Philadelphia / Wells Fargo Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '포스트업 중심',
+},
+
+PHX: {
+  home: 'Phoenix / Footprint Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '미드레인지 엘리트',
+},
+
+POR: {
+  home: 'Portland / Moda Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '리빌딩',
+},
+
+SAC: {
+  home: 'Sacramento / Golden 1 Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '빠른 볼 무브먼트',
+},
+
+SAS: {
+  home: 'San Antonio / Frost Bank Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '기본기 중심',
+},
+
+TOR: {
+  home: 'Toronto / Scotiabank Arena',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '스위치 수비',
+},
+
+UTA: {
+  home: 'Utah / Delta Center',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '조직적인 하프코트',
+},
+
+WAS: {
+  home: 'Washington / Capital One Arena',
+  offense: 3,
+  defense: 2,
+  corePlayers: ['A', 'B'],
+  picks: '2025 1R, 2026 1R',
+  playStyle: '리빌딩',
+},
+
+};
+
+
 const DIVISIONS = {
   West: {
     Southwest: ['DAL', 'HOU', 'MEM', 'NOP', 'SAS'],
