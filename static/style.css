@@ -185,6 +185,18 @@ button[disabled] { opacity:0.55; cursor:default; box-shadow:none; }
 
 /* 팀 선택 */
 
+/* STEP 2(팀 선택) 화면은 "한 눈에 들어오는" 폭이 중요해서,
+   다른 step의 .center-wrapper(900px)와 분리해서 더 넓게 사용합니다. */
+#screen-team-select .center-wrapper.team-select-wrapper {
+  max-width: 1320px;
+  padding: 26px 28px 22px;
+}
+@media (max-width: 920px) {
+  #screen-team-select .center-wrapper.team-select-wrapper {
+    padding: 20px 16px 18px;
+  }
+}
+
 .team-grid {
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
@@ -218,6 +230,389 @@ button[disabled] { opacity:0.55; cursor:default; box-shadow:none; }
   margin-top:4px;
 }
 .team-meta span strong { font-weight:600;margin-right:2px; }
+
+/* 팀 선택: 좌(팀명 카드 리스트) + 우(상세 패널) 레이아웃용 */
+.team-select-layout{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 420px;
+  gap:26px;
+  align-items:start;
+}
+@media (max-width: 1100px){
+  .team-select-layout{ grid-template-columns: minmax(0,1fr) 380px; }
+}
+@media (max-width: 920px){
+  .team-select-layout{ grid-template-columns: 1fr; gap:14px; }
+}
+
+/* 카드가 "팀명만" 보이게 할 때 */
+.team-grid.team-grid-compact{
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.team-grid.team-grid-scroll{
+  max-height: 560px;
+  overflow:auto;
+  padding-right:6px;
+}
+.team-card.team-card-nameonly{
+  padding:14px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  min-height:56px;
+}
+.team-card.team-card-nameonly .team-name{
+  margin:0;
+  font-size:0.92rem;
+  line-height:1.2;
+}
+
+/* STEP 2(팀 선택) 레이아웃 카드화 + 우측 패널 분리 */
+#screen-team-select .team-select-left{
+  background:#ffffff;
+  border:1px solid var(--border-soft);
+  border-radius:16px;
+  padding:14px 14px 12px;
+  box-shadow:0 12px 26px rgba(15,23,42,0.10);
+}
+
+#screen-team-select .team-select-left .team-grid{
+  margin-top:6px;
+}
+
+#screen-team-select .team-card{
+  border-radius:14px;
+  padding:12px 10px;
+}
+
+#screen-team-select .team-card.selected{
+  background: rgba(200,16,46,0.06);
+}
+
+#screen-team-select .team-select-right{
+  position:sticky;
+  top:18px;
+  align-self:start;
+  padding-left: 6px;
+}
+
+#screen-team-select .team-select-right::before{
+  content:"";
+  position:absolute;
+  left:-13px;
+  top:4px;
+  bottom:4px;
+  width:1px;
+  background:linear-gradient(to bottom, transparent, rgba(209,213,219,0.95), transparent);
+}
+
+@media (max-width: 920px){
+  #screen-team-select .team-select-right{
+    position:static;
+    top:auto;
+    padding-left:0;
+  }
+  #screen-team-select .team-select-right::before{ display:none; }
+}
+
+#screen-team-select .team-select-detail{
+  border-radius:16px;
+  border:1px solid var(--border-soft);
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  box-shadow:0 12px 30px rgba(15,23,42,0.12);
+  padding:14px 14px 10px;
+  overflow:hidden;
+}
+
+#screen-team-select .team-detail-header-mini{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:10px;
+  margin-bottom:10px;
+  border-bottom:1px solid var(--border-soft);
+}
+
+#screen-team-select .team-detail-header-mini h3{
+  margin:0;
+  font-size:1.12rem;
+  line-height:1.15;
+  letter-spacing:-0.01em;
+}
+
+#screen-team-select .team-detail-header-mini .pill{
+  border-color: rgba(200,16,46,0.25);
+  background: rgba(200,16,46,0.08);
+  color: var(--accent);
+  font-weight:600;
+}
+
+#screen-team-select .team-detail-section{
+  padding-bottom:10px;
+  margin-bottom:10px;
+  border-bottom:1px dashed rgba(209,213,219,0.75);
+}
+
+#screen-team-select .team-detail-section:last-child{
+  border-bottom:none;
+  margin-bottom:0;
+  padding-bottom:0;
+}
+
+#screen-team-select .team-detail-section-title{
+  font-size:0.72rem;
+  text-transform:uppercase;
+  letter-spacing:0.10em;
+  color:var(--text-muted);
+  margin: 6px 0 6px;
+}
+
+#screen-team-select .team-detail-row{
+  display:grid;
+  grid-template-columns: 150px minmax(0,1fr);
+  gap:10px;
+  padding:8px 0;
+}
+
+#screen-team-select .team-detail-section .team-detail-row{
+  border-bottom:1px solid rgba(229,231,235,0.85);
+}
+
+#screen-team-select .team-detail-section .team-detail-row:last-child{
+  border-bottom:none;
+}
+
+#screen-team-select .team-detail-row .label{
+  color:var(--text-muted);
+  font-size:0.80rem;
+}
+
+#screen-team-select .team-detail-row .value{
+  font-size:0.88rem;
+  font-weight:600;
+  color:var(--text-main);
+  word-break:break-word;
+}
+
+#screen-team-select .team-detail-row .value.multiline{
+  white-space:pre-wrap;
+  line-height:1.35;
+}
+
+#screen-team-select .team-select-actions{
+  margin-top:12px;
+  border-radius:16px;
+  border:1px solid var(--border-soft);
+  background:#ffffff;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  box-shadow:0 10px 24px rgba(15,23,42,0.10);
+}
+
+#screen-team-select #chosenTeamLabel{
+  font-size:1rem;
+}
+
+@media (max-width: 520px){
+  #screen-team-select .team-select-actions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  #screen-team-select .team-select-actions button{
+    width:100%;
+    justify-content:center;
+  }
+}
+
+/* 우측 상세 패널 */
+.team-info-panel{
+  border-radius:12px;
+  border:1px solid var(--border-soft);
+  background:#ffffff;
+  padding:12px;
+}
+.team-info-title{
+  font-weight:700;
+  font-size:1rem;
+  margin:0 0 10px 0;
+}
+.team-info-row{
+  display:grid;
+  grid-template-columns: 140px minmax(0,1fr);
+  gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid #e5e7eb;
+}
+.team-info-row:last-child{ border-bottom:none; }
+.team-info-label{
+  color:var(--text-muted);
+  font-size:0.82rem;
+}
+.team-info-value{
+  font-size:0.85rem;
+  word-break:break-word;
+}
+.team-star-rating{
+  letter-spacing:0.12em;
+}
+
+/* =========================================================
+   STEP 2: 팀 선택 UI 리디자인
+   - 화면 폭 확장
+   - 좌/우 패널 분리
+   - 우측 상세 카드 스타일 개선
+========================================================= */
+
+/* 팀 선택 화면만 wrapper 폭을 넓힘 */
+#screen-team-select .center-wrapper {
+  max-width: 1320px;
+  padding: 26px 28px 22px;
+}
+
+/* 좌측: 팀 리스트를 하나의 카드로 (시각적으로 우측과 분리) */
+#screen-team-select .team-select-left {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 12px 28px rgba(15,23,42,0.10);
+}
+
+#screen-team-select .team-grid {
+  margin-top: 10px;
+  gap: 10px;
+}
+
+/* 우측: 상세 패널(Sticky + 세로 구분선) */
+#screen-team-select .team-select-right {
+  position: sticky;
+  top: 18px;
+  align-self: start;
+  padding-left: 18px;
+}
+
+#screen-team-select .team-select-right::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(209,213,219,0.9), transparent);
+}
+
+@media (max-width: 920px){
+  #screen-team-select .team-select-right{
+    position: static;
+    padding-left: 0;
+  }
+  #screen-team-select .team-select-right::before{ display:none; }
+}
+
+/* 상세 카드 */
+#screen-team-select .team-select-detail{
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  padding: 14px 14px 10px;
+  box-shadow: 0 14px 34px rgba(15,23,42,0.14);
+}
+
+#screen-team-select .team-detail-header-mini{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(229,231,235,0.9);
+}
+
+#screen-team-select #teamSelectDetailName{
+  font-size: 1.1rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+/* 섹션 타이틀 */
+#screen-team-select .team-detail-section{
+  padding: 8px 0 4px;
+}
+
+#screen-team-select .team-detail-section + .team-detail-section{
+  border-top: 1px solid rgba(229,231,235,0.8);
+  margin-top: 6px;
+}
+
+#screen-team-select .team-detail-section-title{
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+/* 상세 row */
+#screen-team-select .team-detail-row{
+  display:grid;
+  grid-template-columns: 140px minmax(0,1fr);
+  gap: 12px;
+  padding: 8px 0;
+}
+
+#screen-team-select .team-detail-row .label{
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+#screen-team-select .team-detail-row .value{
+  font-size: 0.86rem;
+  font-weight: 520;
+  color: var(--text-main);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+#screen-team-select .team-detail-row .value.multiline{
+  white-space: pre-wrap;
+}
+
+/* 하단 액션 바 */
+#screen-team-select .team-select-actions{
+  margin-top: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  background: #ffffff;
+  padding: 12px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  box-shadow: 0 10px 26px rgba(15,23,42,0.10);
+}
+
+#screen-team-select .team-select-actions button{
+  white-space: nowrap;
+}
+
+@media (max-width: 520px){
+  #screen-team-select .team-select-actions{
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #screen-team-select .team-select-actions button{
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 
 /* 메인 쉘 */
 
