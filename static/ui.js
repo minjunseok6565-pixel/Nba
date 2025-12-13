@@ -14,6 +14,19 @@ const btnTeamContinue = document.getElementById('btnTeamContinue');
 const currentTeamLabel = document.getElementById('currentTeamLabel');
 const chosenTeamLabel = document.getElementById('chosenTeamLabel');
 
+// 팀 선택 상세 패널(우측) - HTML에 아래 id가 있으면 자동 채움
+const teamSelectDetailName = document.getElementById('teamSelectDetailName');
+const teamSelectDetailConfDiv = document.getElementById('teamSelectDetailConfDiv');
+const teamSelectDetailCityArena = document.getElementById('teamSelectDetailCityArena');
+const teamSelectDetailOffense = document.getElementById('teamSelectDetailOffense');
+const teamSelectDetailDefense = document.getElementById('teamSelectDetailDefense');
+const teamSelectDetailCore = document.getElementById('teamSelectDetailCore');
+const teamSelectDetailCap = document.getElementById('teamSelectDetailCap');
+const teamSelectDetailPicks = document.getElementById('teamSelectDetailPicks');
+const teamSelectDetailPlayStyle = document.getElementById('teamSelectDetailPlayStyle');
+const teamSelectDetailDifficulty = document.getElementById('teamSelectDetailDifficulty');
+
+
 const navTabs = document.querySelectorAll('#screen-main .nav-tab');
 const tabScreens = {
   home: document.getElementById('tab-home'),
@@ -175,21 +188,93 @@ btnApiKeyNext.addEventListener('click', async () => {
 });
 
 // 팀 선택 UI 렌더링
+function renderStars(value) {
+  const n = Math.max(0, Math.min(5, Number(value ?? 0)));
+  return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
+function highlightSelectedTeamCard(teamId) {
+  if (!teamGrid) return;
+  teamGrid.querySelectorAll('.team-card.selected').forEach(el => el.classList.remove('selected'));
+  if (!teamId) return;
+  const el = teamGrid.querySelector(`.team-card[data-team-id="${teamId}"]`);
+  if (el) el.classList.add('selected');
+}
+
+function updateTeamSelectDetail(teamId) {
+  // 우측 패널이 HTML에 아직 없다면 그냥 패스
+  if (
+    !teamSelectDetailName &&
+    !teamSelectDetailConfDiv &&
+    !teamSelectDetailCityArena &&
+    !teamSelectDetailOffense &&
+    !teamSelectDetailDefense &&
+    !teamSelectDetailCore &&
+    !teamSelectDetailCap &&
+    !teamSelectDetailPicks &&
+    !teamSelectDetailPlayStyle &&
+    !teamSelectDetailDifficulty
+  ) return;
+
+  const team = teamId ? TEAMS.find(t => t.id === teamId) : null;
+  const extras =
+    (teamId && (typeof TEAM_SELECT_DETAILS !== 'undefined') && TEAM_SELECT_DETAILS)
+      ? TEAM_SELECT_DETAILS[teamId]
+      : null;
+
+  const confDiv = teamId ? getTeamConfAndDiv(teamId) : { conference: null, division: null };
+  const confDivText =
+    confDiv.conference && confDiv.division ? `${confDiv.conference} / ${confDiv.division}` : '-';
+
+  const core = extras?.corePlayers;
+  const coreText = Array.isArray(core) ? core.join(', ') : (core || '-');
+
+  const picks = extras?.picks;
+  const picksText = Array.isArray(picks) ? picks.join(', ') : (picks || '-');
+
+  if (teamSelectDetailName) teamSelectDetailName.textContent = team?.name ?? '-';
+  if (teamSelectDetailConfDiv) teamSelectDetailConfDiv.textContent = confDivText;
+  if (teamSelectDetailCityArena) teamSelectDetailCityArena.textContent = extras?.home ?? '-';
+  if (teamSelectDetailOffense) teamSelectDetailOffense.textContent =
+    (extras?.offense ?? extras?.offense === 0) ? renderStars(extras.offense) : '-';
+  if (teamSelectDetailDefense) teamSelectDetailDefense.textContent =
+    (extras?.defense ?? extras?.defense === 0) ? renderStars(extras.defense) : '-';
+  if (teamSelectDetailCore) teamSelectDetailCore.textContent = coreText;
+  if (teamSelectDetailCap) teamSelectDetailCap.textContent = (extras?.cap ?? team?.cap ?? '-');
+  if (teamSelectDetailPicks) teamSelectDetailPicks.textContent = picksText;
+  if (teamSelectDetailPlayStyle) teamSelectDetailPlayStyle.textContent = extras?.playStyle ?? '-';
+  if (teamSelectDetailDifficulty) teamSelectDetailDifficulty.textContent =
+    (extras?.difficulty ?? team?.difficulty ?? '-');
+}
+
 function renderTeamCards() {
+  if (!teamGrid) return;
   teamGrid.innerHTML = '';
+  // "팀명만 나오는 카드" 레이아웃을 쓰고 싶으면 HTML에서 teamGrid에 team-grid-compact/team-grid-scroll 클래스를 줄 수도 있지만,
+  // JS에서도 안전하게 붙여줌(기존 레이아웃 유지하고 싶으면 아래 2줄 삭제해도 됨)
+  teamGrid.classList.add('team-grid-compact');
   TEAMS.forEach(team => {
     const card = document.createElement('div');
-    card.className = 'team-card';
-    card.innerHTML = `
-      <h3>${team.name}</h3>
-      <p>캡 상황: ${team.cap}</p>
-      <p>전력: ${team.overall}</p>
-      <p>난이도: ${team.difficulty}</p>
-    `;
+    card.className = 'team-card team-card-nameonly';
+    card.dataset.teamId = team.id;
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.innerHTML = `<div class="team-name">${team.name}</div>`;
     card.addEventListener('click', () => selectTeam(team.id));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectTeam(team.id);
+      }
+    });
     teamGrid.appendChild(card);
   });
+
+  const selectedId = appState?.selectedTeam?.id;
+  highlightSelectedTeamCard(selectedId);
+  updateTeamSelectDetail(selectedId);
 }
+
 
 // 팀 선택
 function selectTeam(teamId) {
@@ -197,11 +282,16 @@ function selectTeam(teamId) {
   if (!team) return;
 
   appState.selectedTeam = team;
-  currentTeamLabel.textContent = `선택된 팀: ${team.name}`;
-    if (chosenTeamLabel) {
+  if (currentTeamLabel) currentTeamLabel.textContent = team.name;
+  if (chosenTeamLabel) {
     chosenTeamLabel.textContent = team.name;
   }
   btnTeamContinue.disabled = false;
+
+  // 선택 하이라이트 + 우측 상세 패널 갱신
+  highlightSelectedTeamCard(teamId);
+  updateTeamSelectDetail(teamId);
+
 
   // 팀을 선택하면 초기 시즌 스케줄 / 상태를 비워두거나 재설정할 수도 있음
   appState.progressTurns = 0;
