@@ -131,27 +131,96 @@
     </div>
   </section>
 
-  <!-- STEP 2: 팀 선택 -->
-  <section id="screen-team-select" class="step">
-    <div class="center-wrapper">
-      <div class="logo-large" style="margin-bottom:8px;">
-        <span class="logo">느바 시뮬 · <strong>팀 선택</strong></span>
-      </div>
-      <p class="muted" style="font-size:0.88rem;">
-        GM으로 플레이할 팀을 선택하세요. 각 카드에는 샐러리캡 상황, 팀 전력, 난이도가 간단히 표시됩니다.
-      </p>
-
-      <div class="team-grid" id="teamGrid"></div>
-
-      <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;">
-        <div>
-          <div class="muted" style="margin-bottom:2px;">선택한 팀</div>
-          <div><strong id="chosenTeamLabel">없음</strong></div>
-        </div>
-        <button id="btnTeamContinue" disabled>이 팀으로 GM 시작</button>
-      </div>
+<!-- STEP 2: 팀 선택 -->
+<section id="screen-team-select" class="step">
+  <div class="center-wrapper team-select-wrapper">
+    <div class="logo-large" style="margin-bottom:8px;">
+      <span class="logo">느바 시뮬 · <strong>팀 선택</strong></span>
     </div>
-  </section>
+
+    <p class="muted" style="font-size:0.88rem;">
+      GM으로 플레이할 팀을 선택하세요. 왼쪽에서 팀을 고르면 오른쪽에 상세 정보가 표시됩니다.
+    </p>
+
+    <div class="team-select-layout">
+      <!-- 좌측: 팀 목록 -->
+      <div class="team-select-left">
+        <div class="team-grid team-grid-compact" id="teamGrid"></div>
+      </div>
+
+      <!-- 우측: 팀 상세 -->
+      <aside class="team-select-right">
+        <div class="team-select-detail">
+          <div class="team-detail-header-mini">
+            <h3 id="teamSelectDetailName">팀을 선택하세요</h3>
+            <span class="pill" id="teamDetailId" style="display:none;"></span>
+          </div>
+
+          <div class="team-detail-section">
+            <div class="team-detail-section-title">개요</div>
+            <div class="team-detail-row">
+              <span class="label">소속 컨퍼런스 & 디비전</span>
+              <span class="value" id="teamSelectDetailConfDiv">-</span>
+            </div>
+            <div class="team-detail-row">
+              <span class="label">연고지 / 홈 아레나</span>
+              <span class="value" id="teamSelectDetailCityArena">-</span>
+            </div>
+          </div>
+
+          <div class="team-detail-section">
+            <div class="team-detail-section-title">전력</div>
+            <div class="team-detail-row">
+              <span class="label">전력: 공격</span>
+              <span class="value" id="teamSelectDetailOffense">-</span>
+            </div>
+            <div class="team-detail-row">
+              <span class="label">전력: 수비</span>
+              <span class="value" id="teamSelectDetailDefense">-</span>
+            </div>
+            <div class="team-detail-row">
+              <span class="label">핵심 선수</span>
+              <span class="value multiline" id="teamSelectDetailCore">-</span>
+            </div>
+          </div>
+
+          <div class="team-detail-section">
+            <div class="team-detail-section-title">자산</div>
+            <div class="team-detail-row">
+              <span class="label">샐러리캡</span>
+              <span class="value" id="teamSelectDetailCap">-</span>
+            </div>
+            <div class="team-detail-row">
+              <span class="label">보유 픽(5년)</span>
+              <span class="value multiline" id="teamSelectDetailPicks">-</span>
+            </div>
+          </div>
+
+          <div class="team-detail-section">
+            <div class="team-detail-section-title">스타일</div>
+            <div class="team-detail-row">
+              <span class="label">플레이 스타일</span>
+              <span class="value" id="teamSelectDetailPlayStyle">-</span>
+            </div>
+            <div class="team-detail-row">
+              <span class="label">난이도</span>
+              <span class="value" id="teamSelectDetailDifficulty">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="team-select-actions">
+          <div>
+            <div class="muted" style="margin-bottom:2px;font-size:0.8rem;">선택한 팀</div>
+            <div><strong id="chosenTeamLabel">없음</strong></div>
+          </div>
+          <button id="btnTeamContinue" disabled>이 팀으로 GM 시작</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
 
   <!-- STEP 3: 메인 GM 화면 (리디자인 적용) -->
   <section id="screen-main" class="step">
